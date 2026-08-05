@@ -1,10 +1,12 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import Logo from './Logo'
 
 function Header(props) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isLoginPage = location.pathname === '/login';
 
   function handleLogout() {
     logout();
@@ -15,7 +17,7 @@ function Header(props) {
     <nav className="navbar navbar-dark bg-dark">
       <div className="container d-flex justify-content-between align-items-center">
         <span className="navbar-brand mb-0 h1 d-flex align-items-center gap-2">
-        <Logo height={48} showWordmark={false} />
+        <Logo height={35} showWordmark={false} />
         Watch & Wonder
         </span>
 
@@ -32,9 +34,11 @@ function Header(props) {
               </li>
             </>
           ) : (
-            <li className="nav-item">
-              <Link className="nav-link" to="/login">Login</Link>
-            </li>
+            !isLoginPage && (
+              <li className="nav-item">
+                <Link className="nav-link" to="/login">Login</Link>
+              </li>
+            )
           )}
         </ul>
       </div>

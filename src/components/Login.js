@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import './Login.css';
 
 function Login() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -50,72 +51,86 @@ function Login() {
   }
 
   return (
-    <div className="container mt-5">
-      <div className="row justify-content-center">
-        <div className="col-md-4">
-          <div className="card shadow-lg border-0">
-            <div className="card-header bg-dark text-white text-center">
-              <h3>{mode === 'login' ? 'Login' : 'Create Account'}</h3>
-            </div>
-            <div className="card-body">
-              <form onSubmit={handleSubmit}>
-                <div className="mb-3">
-                  <input
-                    className="form-control"
-                    name="uname"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter Username"
-                  />
-                </div>
-                <div className="mb-3">
-                  <input
-                    className="form-control"
-                    type="password"
-                    name="pass"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter Password"
-                  />
-                </div>
-                {mode === 'register' && (
-                  <div className="mb-3">
-                    <input
-                      className="form-control"
-                      type="password"
-                      name="confirmPass"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm Password"
-                    />
-                  </div>
-                )}
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-perf login-perf--top" />
 
-                {error && <p className="text-danger small">{error}</p>}
+        <div className="login-card__body">
+          <p className="login-eyebrow">Watch &amp; Wonder</p>
+          <h1 className="login-title">
+            {mode === 'login' ? 'Welcome back' : 'Join the marquee'}
+          </h1>
+          <p className="login-subtitle">
+            {mode === 'login'
+              ? 'Sign in to keep browsing.'
+              : 'Create an account to start browsing.'}
+          </p>
 
-                <div className="d-grid">
-                  <button className="btn btn-primary" type="submit">
-                    {mode === 'login' ? 'Login' : 'Register'}
-                  </button>
-                </div>
-              </form>
+          <form onSubmit={handleSubmit} className="login-form">
+            <label className="login-field">
+              <span className="login-field__label">Username</span>
+              <input
+                name="uname"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username"
+                autoComplete="username"
+              />
+            </label>
 
-              <p className="text-center mt-3 mb-0">
-                {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-                <button
-                  type="button"
-                  className="btn btn-link p-0"
-                  onClick={() => {
-                    setMode(mode === 'login' ? 'register' : 'login');
-                    setError('');
-                  }}
-                >
-                  {mode === 'login' ? 'Create one' : 'Sign in'}
-                </button>
+            <label className="login-field">
+              <span className="login-field__label">Password</span>
+              <input
+                type="password"
+                name="pass"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+            </label>
+
+            {mode === 'register' && (
+              <label className="login-field">
+                <span className="login-field__label">Confirm password</span>
+                <input
+                  type="password"
+                  name="confirmPass"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
+                />
+              </label>
+            )}
+
+            {error && (
+              <p className="login-error" role="alert">
+                {error}
               </p>
-            </div>
-          </div>
+            )}
+
+            <button className="login-submit" type="submit">
+              {mode === 'login' ? 'Sign in' : 'Create account'}
+            </button>
+          </form>
+
+          <p className="login-switch">
+            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+            <button
+              type="button"
+              className="login-switch__link"
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login');
+                setError('');
+              }}
+            >
+              {mode === 'login' ? 'Create one' : 'Sign in'}
+            </button>
+          </p>
         </div>
+
+        <div className="login-perf login-perf--bottom" />
       </div>
     </div>
   );

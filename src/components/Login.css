@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+/* ---- Tokens ---- */
+.login-page {
+  --bg: #000000;
+  --surface: #14181f;
+  --surface-2: #1c212b;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+  --crimson: #e2645a;
+
+  width: 100%;
+  min-height: 100%;
+  flex: 1 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  background:
+    radial-gradient(560px 360px at 50% 38%, rgba(232, 176, 75, 0.08), transparent 70%),
+    var(--bg);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ---- Card ---- */
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+/* Filmstrip sprocket-hole perforation — the signature motif */
+.login-perf {
+  height: 18px;
+  background-image: radial-gradient(circle, var(--bg) 4.5px, transparent 5px);
+  background-size: 26px 18px;
+  background-position: 13px center;
+  background-color: var(--surface-2);
+}
+
+.login-perf--top {
+  border-bottom: 1px solid var(--border);
+}
+
+.login-perf--bottom {
+  border-top: 1px solid var(--border);
+}
+
+.login-card__body {
+  padding: 36px 32px 30px;
+}
+
+/* ---- Header text ---- */
+.login-eyebrow {
+  margin: 0 0 6px;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-align: center;
+}
+
+.login-title {
+  margin: 0 0 6px;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.1rem;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  text-align: center;
+  line-height: 1.1;
+}
+
+.login-subtitle {
+  margin: 0 0 28px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---- Form ---- */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-field__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.login-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--cream);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login-field input::placeholder {
+  color: #5b6272;
+}
+
+.login-field input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(232, 176, 75, 0.18);
+}
+
+.login-error {
+  margin: 0;
+  padding: 9px 12px;
+  font-size: 0.83rem;
+  color: var(--crimson);
+  background: rgba(226, 100, 90, 0.1);
+  border: 1px solid rgba(226, 100, 90, 0.35);
+  border-radius: 8px;
+}
+
+/* ---- Submit button: marquee-lit look ---- */
+.login-submit {
+  margin-top: 4px;
+  padding: 12px 16px;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  color: #1a1400;
+  background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login-submit:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(232, 176, 75, 0.3);
+}
+
+.login-submit:active {
+  transform: translateY(1px);
+}
+
+.login-submit:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ---- Mode switch ---- */
+.login-switch {
+  margin: 22px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.login-switch__link {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--gold);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.login-switch__link:hover {
+  color: #f2c467;
+}
+
+.login-switch__link:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---- Motion respect ---- */
+@media (prefers-reduced-motion: reduce) {
+  .login-submit {
+    transition: none;
+  }
+}
+
+/* ---- Small screens ---- */
+@media (max-width: 420px) {
+  .login-card__body {
+    padding: 28px 22px 24px;
+  }
+  .login-title {
+    font-size: 1.8rem;
+  }
+}
