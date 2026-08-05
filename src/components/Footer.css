@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+.app-footer {
+  --gold: #e8b04b;
+  --cream: #f2ede4;
+  --surface: #14181f;
+  --border: #282e3a;
+
+  background-color: var(--surface) !important;
+  border-top: 1px solid var(--border);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.app-footer strong {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  letter-spacing: 0.05em;
+  color: var(--gold) !important;
+  font-weight: 400;
+  font-size: 1.05rem;
+}
+
+.app-footer .text-white.small {
+  color: var(--cream) !important;
+  opacity: 0.75;
+}

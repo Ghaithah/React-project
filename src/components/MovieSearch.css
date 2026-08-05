@@ -1,16 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
 .movie-search {
+  --bg: #000000;
+  --surface: #14181f;
+  --surface-2: #1c212b;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+  --crimson: #e2645a;
+
   max-width: 800px;
   width: 100%;
   margin: 0 auto;
   padding: 40px 24px 80px;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 .movie-search__title {
   text-align: center;
-  font-size: 2.25rem;
-  font-weight: 700;
-  margin-bottom: 32px;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 0 0 14px;
+  color: var(--cream);
+}
+
+/* Filmstrip sprocket-hole divider — echoes the login card motif */
+.movie-search__title::after {
+  content: "";
+  display: block;
+  width: 140px;
+  height: 14px;
+  margin: 14px auto 0;
+  background-image: radial-gradient(circle, var(--bg) 3.5px, transparent 4px);
+  background-size: 20px 14px;
+  background-position: 10px center;
+  background-color: var(--surface-2);
+  border-radius: 3px;
 }
 
 /* --- Controls: search + filter toggle --- */
@@ -26,37 +55,48 @@
 
 .movie-search__input {
   flex: 1;
+  box-sizing: border-box;
   padding: 14px 16px;
   font-size: 1rem;
-  border: 1px solid #d4d4d4;
+  font-family: inherit;
+  color: var(--cream);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.movie-search__input::placeholder {
+  color: #5b6272;
 }
 
 .movie-search__input:focus {
-  border-color: #171717;
-  box-shadow: 0 0 0 2px rgba(23, 23, 23, 0.1);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(232, 176, 75, 0.18);
 }
 
 .movie-search__filter-toggle {
   padding: 0 20px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid var(--gold-dim);
   border-radius: 8px;
-  background: white;
-  font-weight: 500;
+  background: transparent;
+  color: var(--gold);
+  font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .movie-search__filter-toggle:hover {
-  background: #f5f5f5;
+  background: rgba(232, 176, 75, 0.1);
 }
 
 .movie-search__filter-toggle.is-active {
-  background: #171717;
-  color: white;
-  border-color: #171717;
+  background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
+  color: #1a1400;
+  border-color: var(--gold);
 }
 
 /* --- Filters panel --- */
@@ -64,8 +104,8 @@
 .movie-search__filters {
   margin-top: 12px;
   padding: 16px;
-  background: #fafafa;
-  border: 1px solid #e5e5e5;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -76,24 +116,39 @@
 .movie-search__filter-field {
   display: flex;
   flex-direction: column;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #525252;
-  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  gap: 6px;
 }
 
 .movie-search__filter-field select,
 .movie-search__filter-field input {
   padding: 8px 10px;
-  border: 1px solid #d4d4d4;
-  border-radius: 6px;
+  font-family: inherit;
   font-size: 0.9rem;
-  background: white;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cream);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+
+.movie-search__filter-field select:focus,
+.movie-search__filter-field input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(232, 176, 75, 0.16);
 }
 
 .movie-search__hint {
   font-weight: 400;
-  color: #a3a3a3;
+  text-transform: none;
+  color: var(--gold-dim);
   font-style: italic;
 }
 
@@ -102,22 +157,24 @@
   justify-self: start;
   background: none;
   border: none;
-  color: #737373;
+  color: var(--gold);
   font-size: 0.85rem;
+  font-weight: 600;
   text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
   padding: 4px 0;
 }
 
 .movie-search__clear:hover {
-  color: #171717;
+  color: #f2c467;
 }
 
 /* --- Status text --- */
 
 .movie-search__status {
   text-align: center;
-  color: #737373;
+  color: var(--muted);
   margin-top: 60px;
   font-size: 0.95rem;
 }
@@ -132,23 +189,24 @@
 }
 
 .movie-card {
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
-  background: white;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  background: var(--surface);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
   cursor: pointer;
 }
 
 .movie-card:hover {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(232, 176, 75, 0.12);
+  border-color: var(--gold-dim);
   transform: translateY(-2px);
 }
 
 .movie-card__poster {
   position: relative;
   aspect-ratio: 2 / 3;
-  background: #f0f0f0;
+  background: var(--surface-2);
 }
 
 .movie-card__poster img {
@@ -164,7 +222,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #a3a3a3;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -172,8 +230,8 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(0, 0, 0, 0.75);
-  color: white;
+  background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
+  color: #1a1400;
   font-size: 0.75rem;
   font-weight: 700;
   padding: 2px 6px;
@@ -182,6 +240,7 @@
 
 .movie-card__info {
   padding: 10px 12px;
+  background: var(--surface);
 }
 
 .movie-card__title {
@@ -189,11 +248,12 @@
   font-size: 0.9rem;
   line-height: 1.3;
   margin: 0 0 4px;
+  color: var(--cream);
 }
 
 .movie-card__meta {
   font-size: 0.8rem;
-  color: #737373;
+  color: var(--muted);
   margin: 0;
   text-transform: capitalize;
 }
@@ -211,7 +271,7 @@
 .skeleton-line {
   height: 10px;
   border-radius: 4px;
-  background: #e5e5e5;
+  background: var(--border);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
@@ -227,4 +287,12 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* ---- Motion respect ---- */
+@media (prefers-reduced-motion: reduce) {
+  .movie-card,
+  .movie-search__filter-toggle {
+    transition: none;
+  }
 }
