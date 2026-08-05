@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
+import Logo from './Logo'
 
 function Header(props) {
   const { user, logout } = useAuth();
@@ -13,9 +14,9 @@ function Header(props) {
   return (
     <nav className="navbar navbar-dark bg-dark">
       <div className="container d-flex justify-content-between align-items-center">
-        <span className="navbar-brand mb-0 h1">
-          <i className="bi bi-people me-2"></i>
-          Watch & Wonder
+        <span className="navbar-brand mb-0 h1 d-flex align-items-center gap-2">
+        <Logo height={48} showWordmark={false} />
+        Watch & Wonder
         </span>
 
         <ul className="nav align-items-center mb-0">
