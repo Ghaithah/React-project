@@ -60,7 +60,7 @@
   font-size: 1rem;
   font-family: inherit;
   color: var(--cream);
-  background: var(--surface-2);
+  background: var(--surface-2); 
   border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
@@ -168,6 +168,17 @@
 
 .movie-search__clear:hover {
   color: #f2c467;
+}
+
+/* --- Section heading (used for the "Popular Right Now" browse grid) --- */
+
+.movie-search__section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin: 0 0 12px;
 }
 
 /* --- Status text --- */

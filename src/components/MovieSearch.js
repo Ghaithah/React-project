@@ -8,6 +8,26 @@ const DEBOUNCE_MS = 400;
 // Genre and imdbRating require a separate detail lookup (i=imdbID) per title,
 // which is why they're fetched lazily below rather than up front.
 
+// Curated picks shown as soon as the visitor lands on the page (before they've
+// typed anything), so the screen isn't empty — similar to a Netflix homepage.
+// OMDb has no "trending"/"popular" endpoint, so this is a hand-picked list of
+// well-known titles across genres/types, fetched via the detail endpoint
+// (which already includes Genre + imdbRating, unlike the search endpoint).
+const FEATURED_IDS = [
+  "tt1375666", // Inception
+  "tt0468569", // The Dark Knight
+  "tt0816692", // Interstellar
+  "tt6751668", // Parasite
+  "tt4154796", // Avengers: Endgame
+  "tt0111161", // The Shawshank Redemption
+  "tt0110912", // Pulp Fiction
+  "tt0137523", // Fight Club
+  "tt0944947", // Game of Thrones
+  "tt4574334", // Stranger Things
+  "tt7366338", // Chernobyl
+  "tt0903747", // Breaking Bad
+];
+
 function useDebouncedValue(value, delay) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -21,6 +41,21 @@ function parseStartYear(yearField) {
   // Handles both "2013" and series ranges like "2017–2020" / "2017–"
   const match = /\d{4}/.exec(yearField || "");
   return match ? parseInt(match[0], 10) : null;
+}
+
+function parseDetailToMovie(detail) {
+  return {
+    Title: detail.Title,
+    Year: detail.Year,
+    imdbID: detail.imdbID,
+    Type: detail.Type,
+    Poster: detail.Poster,
+    Genre: detail.Genre || "",
+    imdbRating:
+      detail.imdbRating && detail.imdbRating !== "N/A"
+        ? parseFloat(detail.imdbRating)
+        : null,
+  };
 }
 
 const TYPE_OPTIONS = [
@@ -47,6 +82,10 @@ export default function MovieSearch() {
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
 
+  // Browse mode: what's shown before the visitor searches for anything.
+  const [browseMovies, setBrowseMovies] = useState([]);
+  const [browseLoading, setBrowseLoading] = useState(true);
+
   const [showFilters, setShowFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState("");
   const [genreFilter, setGenreFilter] = useState("");
@@ -55,6 +94,30 @@ export default function MovieSearch() {
   const [sortBy, setSortBy] = useState("relevance");
 
   const searchRequestId = useRef(0);
+
+  // --- Load the curated "browse" picks once, on mount ---
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all(
+      FEATURED_IDS.map((id) =>
+        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}`)
+          .then((res) => res.json())
+          .catch(() => null)
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const parsed = results
+        .filter((d) => d && d.Response !== "False")
+        .map(parseDetailToMovie);
+      setBrowseMovies(parsed);
+      setBrowseLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // --- Search (debounced, fires as the user types) ---
   useEffect(() => {
@@ -93,9 +156,11 @@ export default function MovieSearch() {
       });
   }, [debouncedQuery]);
 
-  // --- Background enrichment: fetch Genre + imdbRating per result ---
+  // --- Background enrichment: fetch Genre + imdbRating per search result ---
   // Runs after search results land, so genre filtering and rating sort
-  // become available a beat after the grid first appears.
+  // become available a beat after the grid first appears. Browse picks
+  // already carry this data from the detail lookup above, so they're
+  // untouched by this effect.
   useEffect(() => {
     const needsDetail = movies.filter((m) => m.Genre === null);
     if (needsDetail.length === 0) return;
@@ -131,18 +196,23 @@ export default function MovieSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movies.length, debouncedQuery]);
 
+  // The list actually on screen: search results once the visitor has typed
+  // something, otherwise the curated browse picks.
+  const activeMovies = searched ? movies : browseMovies;
+  const activeLoading = searched ? loading : browseLoading;
+
   // --- Derived: genre options available so far ---
   const genreOptions = useMemo(() => {
     const set = new Set();
-    movies.forEach((m) => {
+    activeMovies.forEach((m) => {
       if (m.Genre) m.Genre.split(",").map((g) => g.trim()).forEach((g) => set.add(g));
     });
     return ["", ...Array.from(set).sort()];
-  }, [movies]);
+  }, [activeMovies]);
 
   // --- Filtering + sorting ---
   const filteredMovies = useMemo(() => {
-    let list = [...movies];
+    let list = [...activeMovies];
 
     if (typeFilter) list = list.filter((m) => m.Type === typeFilter);
     if (genreFilter) {
@@ -179,7 +249,7 @@ export default function MovieSearch() {
     }
 
     return list;
-  }, [movies, typeFilter, genreFilter, yearMin, yearMax, sortBy]);
+  }, [activeMovies, typeFilter, genreFilter, yearMin, yearMax, sortBy]);
 
   const activeFilterCount =
     (typeFilter ? 1 : 0) + (genreFilter ? 1 : 0) + (yearMin ? 1 : 0) + (yearMax ? 1 : 0);
@@ -271,9 +341,13 @@ export default function MovieSearch() {
         )}
       </div>
 
-      {loading && (
+      {!searched && !activeLoading && (
+        <h2 className="movie-search__section-title">Popular Right Now</h2>
+      )}
+
+      {activeLoading && (
         <div className="movie-search__grid">
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: searched ? 8 : FEATURED_IDS.length }).map((_, i) => (
             <div key={i} className="movie-card movie-card--skeleton">
               <div className="movie-card__poster movie-card__poster--skeleton" />
               <div className="movie-card__info">
@@ -285,15 +359,15 @@ export default function MovieSearch() {
         </div>
       )}
 
-      {!loading && error && <p className="movie-search__status">{error}</p>}
+      {!activeLoading && searched && error && <p className="movie-search__status">{error}</p>}
 
-      {!loading && !error && searched && filteredMovies.length === 0 && movies.length > 0 && (
+      {!activeLoading && !error && filteredMovies.length === 0 && activeMovies.length > 0 && (
         <p className="movie-search__status">
           No results match your filters. Try widening the year range or clearing a filter.
         </p>
       )}
 
-      {!loading && !error && searched && filteredMovies.length > 0 && (
+      {!activeLoading && !error && filteredMovies.length > 0 && (
         <div className="movie-search__grid">
           {filteredMovies.map((movie) => (
             <div key={movie.imdbID} className="movie-card">
@@ -318,7 +392,7 @@ export default function MovieSearch() {
         </div>
       )}
 
-      {!loading && !searched && (
+      {!activeLoading && !searched && !error && activeMovies.length === 0 && (
         <p className="movie-search__status">
           Search for a movie title to get started.
         </p>
