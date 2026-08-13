@@ -51,6 +51,43 @@ function parseStartYear(yearField) {
   return match ? parseInt(match[0], 10) : null;
 }
 
+// OMDb only offers two plot lengths — "short" (one terse sentence) and
+// "full" (which can run to a long paragraph). Neither lands in between, so
+// we fetch "full" and keep the first few complete sentences here, stopping
+// at a period rather than cutting mid-word/mid-sentence with an ellipsis.
+const PLOT_MAX_LENGTH = 320;
+const PLOT_MAX_SENTENCES = 3;
+
+// Abbreviations like "L.A." or "Mr." contain periods that aren't sentence
+// endings. Swap those periods for a placeholder before splitting on
+// sentence punctuation, then swap them back in the kept result — otherwise
+// "...back to L." / "A., fugitive..." gets split as two fake sentences.
+const ABBREVIATIONS = /\b(?:[A-Z]\.){2,}|\b(?:Mr|Mrs|Ms|Dr|Jr|Sr|St|vs|etc)\./g;
+const PERIOD_PLACEHOLDER = "\u0000";
+
+function truncatePlot(text) {
+  if (!text) return text;
+  const trimmed = text.trim();
+
+  const protectedText = trimmed.replace(ABBREVIATIONS, (m) =>
+    m.split(".").join(PERIOD_PLACEHOLDER)
+  );
+  const sentences = protectedText.match(/[^.!?]+[.!?]+(\s+|$)/g);
+  if (!sentences) return trimmed; // no sentence punctuation to split on — leave as-is
+
+  let result = "";
+  for (let i = 0; i < sentences.length && i < PLOT_MAX_SENTENCES; i++) {
+    const next = result + sentences[i];
+    // Always keep at least the first sentence, even if it alone exceeds the
+    // length cap — better a long single sentence than a mid-sentence cut.
+    if (result && next.trim().length > PLOT_MAX_LENGTH) break;
+    result = next;
+  }
+
+  result = result.trim().split(PERIOD_PLACEHOLDER).join(".");
+  return result.length < trimmed.length ? result : trimmed;
+}
+
 function parseDetailToMovie(detail) {
   return {
     Title: detail.Title,
@@ -565,54 +602,60 @@ export default function MovieSearch() {
             )}
             {!detailLoading && !detailError && movieDetail && (
               <>
-                <div className="movie-search__detail-meta">
-                  {movieDetail.Year && movieDetail.Year !== "N/A" && (
-                    <span>{movieDetail.Year}</span>
-                  )}
-                  {movieDetail.Type === "series" &&
-                    movieDetail.totalSeasons &&
-                    movieDetail.totalSeasons !== "N/A" && (
-                      <span>
-                        {movieDetail.totalSeasons} Season
-                        {movieDetail.totalSeasons === "1" ? "" : "s"}
-                      </span>
+                <div className="movie-search__detail-body">
+                  <div className="movie-search__detail-main">
+                    <div className="movie-search__detail-meta">
+                      {movieDetail.Year && movieDetail.Year !== "N/A" && (
+                        <span>{movieDetail.Year}</span>
+                      )}
+                      {movieDetail.Type === "series" &&
+                        movieDetail.totalSeasons &&
+                        movieDetail.totalSeasons !== "N/A" && (
+                          <span>
+                            {movieDetail.totalSeasons} Season
+                            {movieDetail.totalSeasons === "1" ? "" : "s"}
+                          </span>
+                        )}
+                      {movieDetail.Runtime && movieDetail.Runtime !== "N/A" && (
+                        <span>{movieDetail.Runtime}</span>
+                      )}
+                      {movieDetail.Rated && movieDetail.Rated !== "N/A" && (
+                        <span className="movie-search__badge">{movieDetail.Rated}</span>
+                      )}
+                      {movieDetail.imdbRating && movieDetail.imdbRating !== "N/A" && (
+                        <span className="movie-search__badge movie-search__badge--gold">
+                          ★ {movieDetail.imdbRating}
+                        </span>
+                      )}
+                    </div>
+
+                    {movieDetail.Plot && movieDetail.Plot !== "N/A" && (
+                      <p className="movie-search__detail-plot">
+                        {truncatePlot(movieDetail.Plot)}
+                      </p>
                     )}
-                  {movieDetail.Runtime && movieDetail.Runtime !== "N/A" && (
-                    <span>{movieDetail.Runtime}</span>
-                  )}
-                  {movieDetail.Rated && movieDetail.Rated !== "N/A" && (
-                    <span className="movie-search__badge">{movieDetail.Rated}</span>
-                  )}
-                  {movieDetail.imdbRating && movieDetail.imdbRating !== "N/A" && (
-                    <span className="movie-search__badge movie-search__badge--gold">
-                      ★ {movieDetail.imdbRating}
-                    </span>
-                  )}
-                </div>
+                  </div>
 
-                {movieDetail.Plot && movieDetail.Plot !== "N/A" && (
-                  <p className="movie-search__detail-plot">{movieDetail.Plot}</p>
-                )}
-
-                <div className="movie-search__detail-facts">
-                  {movieDetail.Actors && movieDetail.Actors !== "N/A" && (
-                    <p>
-                      <span className="movie-search__detail-label">Cast:</span>{" "}
-                      {movieDetail.Actors}
-                    </p>
-                  )}
-                  {movieDetail.Genre && movieDetail.Genre !== "N/A" && (
-                    <p>
-                      <span className="movie-search__detail-label">Genres:</span>{" "}
-                      {movieDetail.Genre}
-                    </p>
-                  )}
-                  {movieDetail.Director && movieDetail.Director !== "N/A" && (
-                    <p>
-                      <span className="movie-search__detail-label">Director:</span>{" "}
-                      {movieDetail.Director}
-                    </p>
-                  )}
+                  <div className="movie-search__detail-facts">
+                    {movieDetail.Actors && movieDetail.Actors !== "N/A" && (
+                      <p>
+                        <span className="movie-search__detail-label">Cast:</span>{" "}
+                        {movieDetail.Actors}
+                      </p>
+                    )}
+                    {movieDetail.Genre && movieDetail.Genre !== "N/A" && (
+                      <p>
+                        <span className="movie-search__detail-label">Genres:</span>{" "}
+                        {movieDetail.Genre}
+                      </p>
+                    )}
+                    {movieDetail.Director && movieDetail.Director !== "N/A" && (
+                      <p>
+                        <span className="movie-search__detail-label">Director:</span>{" "}
+                        {movieDetail.Director}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {movieDetail.Type === "series" &&

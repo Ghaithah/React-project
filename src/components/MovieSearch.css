@@ -253,6 +253,9 @@
 /* --- Title details (rating, runtime, cast, plot, episodes) --- */
 
 .movie-search__detail {
+  /* Everything in here should read left-to-right, not inherit the
+     center alignment set globally on .App for the CRA splash screen. */
+  text-align: left;
   padding: 18px;
   border-top: 1px solid var(--border);
 }
@@ -261,6 +264,26 @@
   color: var(--muted);
   font-size: 0.9rem;
   margin: 0;
+}
+
+/* Two columns once there's room: description on the left, quick facts
+   (cast/genres/director) as a compact list on the right — mirrors the
+   Netflix title-page layout instead of stacking everything full-width. */
+.movie-search__detail-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 620px) {
+  .movie-search__detail-body {
+    grid-template-columns: minmax(0, 1fr) 230px;
+    gap: 32px;
+  }
+}
+
+.movie-search__detail-main {
+  min-width: 0;
 }
 
 .movie-search__detail-meta {
@@ -290,25 +313,31 @@
   color: var(--cream);
   font-size: 0.95rem;
   line-height: 1.55;
-  margin: 0 0 16px;
+  margin: 0;
 }
 
 .movie-search__detail-facts {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 4px;
+  gap: 14px;
+  min-width: 0;
 }
 
 .movie-search__detail-facts p {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   line-height: 1.5;
   color: var(--cream);
 }
 
 .movie-search__detail-label {
+  display: block;
   color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
 /* --- Episode browser --- */
