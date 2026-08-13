@@ -60,7 +60,7 @@
   font-size: 1rem;
   font-family: inherit;
   color: var(--cream);
-  background: var(--surface-2); 
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
@@ -170,6 +170,237 @@
   color: #f2c467;
 }
 
+/* --- Trailer player --- */
+
+.movie-search__trailer {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.movie-search__trailer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.movie-search__trailer-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movie-search__trailer-year {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.movie-search__trailer-close {
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__trailer-close:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+.movie-search__trailer-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.movie-search__trailer-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.movie-search__trailer-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 0 20px;
+  text-align: center;
+}
+
+/* --- Title details (rating, runtime, cast, plot, episodes) --- */
+
+.movie-search__detail {
+  padding: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__detail-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.movie-search__detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 14px;
+}
+
+.movie-search__badge {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  color: var(--cream);
+}
+
+.movie-search__badge--gold {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+.movie-search__detail-plot {
+  color: var(--cream);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.movie-search__detail-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.movie-search__detail-facts p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--cream);
+}
+
+.movie-search__detail-label {
+  color: var(--muted);
+}
+
+/* --- Episode browser --- */
+
+.movie-search__episodes {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__episodes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.movie-search__episodes-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cream);
+}
+
+.movie-search__episodes-header select {
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--cream);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+
+.movie-search__episodes-header select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(232, 176, 75, 0.16);
+}
+
+.movie-search__episode-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.movie-search__episode {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  column-gap: 14px;
+  align-items: baseline;
+  padding: 11px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.movie-search__episode:last-child {
+  border-bottom: none;
+}
+
+.movie-search__episode:hover {
+  background: var(--surface-2);
+}
+
+.movie-search__episode-number {
+  color: var(--gold-dim);
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.movie-search__episode-info {
+  min-width: 0;
+}
+
+.movie-search__episode-title {
+  margin: 0 0 3px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cream);
+}
+
+.movie-search__episode-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
 /* --- Section heading (used for the "Popular Right Now" browse grid) --- */
 
 .movie-search__section-title {
@@ -212,6 +443,11 @@
   box-shadow: 0 8px 24px rgba(232, 176, 75, 0.12);
   border-color: var(--gold-dim);
   transform: translateY(-2px);
+}
+
+.movie-card--selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(232, 176, 75, 0.35);
 }
 
 .movie-card__poster {

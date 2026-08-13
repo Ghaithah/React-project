@@ -4,6 +4,14 @@ import "./MovieSearch.css";
 const API_KEY = "7894ef1b"; // get one free at https://www.omdbapi.com/apikey.aspx
 const DEBOUNCE_MS = 400;
 
+// YouTube Data API v3 key, used to look up each movie's trailer.
+// Get a free one at https://console.cloud.google.com/:
+//   1. Create (or select) a project
+//   2. APIs & Services -> Library -> enable "YouTube Data API v3"
+//   3. APIs & Services -> Credentials -> Create Credentials -> API key
+// Paste the key below.
+const YOUTUBE_API_KEY = "AIzaSyA-rxBgD7E1QSbKsw-GrBwccVcJRyNsZIA";
+
 // OMDb's search endpoint (s=) only returns Title, Year, imdbID, Type, Poster.
 // Genre and imdbRating require a separate detail lookup (i=imdbID) per title,
 // which is why they're fetched lazily below rather than up front.
@@ -93,7 +101,31 @@ export default function MovieSearch() {
   const [yearMax, setYearMax] = useState("");
   const [sortBy, setSortBy] = useState("relevance");
 
+  // Trailer player: which movie is selected, and the YouTube video id for it.
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const [trailerId, setTrailerId] = useState(null);
+  const [trailerLoading, setTrailerLoading] = useState(false);
+  const [trailerError, setTrailerError] = useState("");
+
+  // Full title details (rating, runtime, cast, plot, etc.) + episode browser
+  // for series, shown alongside the trailer — OMDb's "i=" detail lookup with
+  // plot=full covers everything Netflix-style cards show except content
+  // warnings and mood tags, which no free movie API provides.
+  const [movieDetail, setMovieDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  const [selectedSeason, setSelectedSeason] = useState(1);
+  const [episodes, setEpisodes] = useState([]);
+  const [episodesLoading, setEpisodesLoading] = useState(false);
+
   const searchRequestId = useRef(0);
+  const trailerRequestId = useRef(0);
+  const trailerCache = useRef({}); // imdbID -> videoId | null
+  const detailRequestId = useRef(0);
+  const detailCache = useRef({}); // imdbID -> detail object | null
+  const episodesRequestId = useRef(0);
+  const episodesCache = useRef({}); // "imdbID:season" -> episodes array
 
   // --- Load the curated "browse" picks once, on mount ---
   useEffect(() => {
@@ -261,6 +293,154 @@ export default function MovieSearch() {
     setYearMax("");
   }
 
+  // --- Trailer selection ---
+  // Clicking a movie shows its trailer above the grid. Clicking a different
+  // movie clears whatever trailer is playing and loads the new one. Results
+  // are cached per imdbID so re-clicking the same poster doesn't re-fetch.
+  function selectMovie(movie) {
+    setSelectedMovie(movie);
+    setTrailerId(null);
+    setTrailerError("");
+
+    const cached = trailerCache.current[movie.imdbID];
+    if (cached !== undefined) {
+      trailerRequestId.current++; // invalidate any in-flight fetch from a previous click
+      setTrailerId(cached);
+      setTrailerLoading(false);
+      if (cached === null) setTrailerError("No trailer found for this title.");
+    } else {
+      const requestId = ++trailerRequestId.current;
+      setTrailerLoading(true);
+
+      const q = encodeURIComponent(`${movie.Title} ${movie.Year} official trailer`);
+      fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=${q}&key=${YOUTUBE_API_KEY}`
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          if (requestId !== trailerRequestId.current) return; // a newer click superseded this one
+          const videoId =
+            data.items && data.items[0] && data.items[0].id
+              ? data.items[0].id.videoId
+              : null;
+          trailerCache.current[movie.imdbID] = videoId || null;
+          setTrailerId(videoId || null);
+          if (!videoId) setTrailerError("No trailer found for this title.");
+        })
+        .catch(() => {
+          if (requestId !== trailerRequestId.current) return;
+          setTrailerError("Couldn't load the trailer. Try again.");
+        })
+        .finally(() => {
+          if (requestId === trailerRequestId.current) setTrailerLoading(false);
+        });
+    }
+
+    fetchDetail(movie);
+  }
+
+  // --- Title details (rating, runtime, cast, plot, genres, episodes) ---
+  function fetchDetail(movie) {
+    setMovieDetail(null);
+    setDetailError("");
+    setEpisodes([]);
+    setSelectedSeason(1);
+
+    const cached = detailCache.current[movie.imdbID];
+    if (cached !== undefined) {
+      detailRequestId.current++; // invalidate any in-flight fetch from a previous click
+      setDetailLoading(false);
+      if (cached === null) {
+        setDetailError("Couldn't load details for this title.");
+      } else {
+        setMovieDetail(cached);
+        if (cached.Type === "series" && cached.totalSeasons && cached.totalSeasons !== "N/A") {
+          fetchEpisodes(movie.imdbID, 1);
+        }
+      }
+      return;
+    }
+
+    const requestId = ++detailRequestId.current;
+    setDetailLoading(true);
+
+    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${movie.imdbID}&plot=full`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (requestId !== detailRequestId.current) return; // a newer click superseded this one
+        if (data.Response === "False") {
+          detailCache.current[movie.imdbID] = null;
+          setDetailError(data.Error || "Couldn't load details for this title.");
+          return;
+        }
+        detailCache.current[movie.imdbID] = data;
+        setMovieDetail(data);
+        if (data.Type === "series" && data.totalSeasons && data.totalSeasons !== "N/A") {
+          fetchEpisodes(movie.imdbID, 1);
+        }
+      })
+      .catch(() => {
+        if (requestId !== detailRequestId.current) return;
+        setDetailError("Couldn't load details for this title.");
+      })
+      .finally(() => {
+        if (requestId === detailRequestId.current) setDetailLoading(false);
+      });
+  }
+
+  function fetchEpisodes(imdbID, season) {
+    const cacheKey = `${imdbID}:${season}`;
+    const cached = episodesCache.current[cacheKey];
+    if (cached !== undefined) {
+      episodesRequestId.current++; // invalidate any in-flight fetch for a different season
+      setEpisodes(cached);
+      setEpisodesLoading(false);
+      return;
+    }
+
+    const requestId = ++episodesRequestId.current;
+    setEpisodesLoading(true);
+
+    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${imdbID}&Season=${season}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (requestId !== episodesRequestId.current) return;
+        const list = data.Response !== "False" && data.Episodes ? data.Episodes : [];
+        episodesCache.current[cacheKey] = list;
+        setEpisodes(list);
+      })
+      .catch(() => {
+        if (requestId !== episodesRequestId.current) return;
+        episodesCache.current[cacheKey] = [];
+        setEpisodes([]);
+      })
+      .finally(() => {
+        if (requestId === episodesRequestId.current) setEpisodesLoading(false);
+      });
+  }
+
+  function handleSeasonChange(season) {
+    const s = Number(season);
+    setSelectedSeason(s);
+    if (selectedMovie) fetchEpisodes(selectedMovie.imdbID, s);
+  }
+
+  function closeTrailer() {
+    trailerRequestId.current++; // invalidate any in-flight fetches
+    detailRequestId.current++;
+    episodesRequestId.current++;
+    setSelectedMovie(null);
+    setTrailerId(null);
+    setTrailerError("");
+    setTrailerLoading(false);
+    setMovieDetail(null);
+    setDetailError("");
+    setDetailLoading(false);
+    setEpisodes([]);
+    setSelectedSeason(1);
+    setEpisodesLoading(false);
+  }
+
   return (
     <div className="movie-search">
       <h1 className="movie-search__title">Movie Search</h1>
@@ -341,6 +521,159 @@ export default function MovieSearch() {
         )}
       </div>
 
+      {selectedMovie && (
+        <div className="movie-search__trailer">
+          <div className="movie-search__trailer-header">
+            <h2>
+              {selectedMovie.Title}{" "}
+              <span className="movie-search__trailer-year">({selectedMovie.Year})</span>
+            </h2>
+            <button
+              type="button"
+              className="movie-search__trailer-close"
+              onClick={closeTrailer}
+              aria-label="Close trailer"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="movie-search__trailer-frame">
+            {trailerLoading && (
+              <div className="movie-search__trailer-status">Loading trailer…</div>
+            )}
+            {!trailerLoading && trailerError && (
+              <div className="movie-search__trailer-status">{trailerError}</div>
+            )}
+            {!trailerLoading && !trailerError && trailerId && (
+              <iframe
+                key={trailerId}
+                src={`https://www.youtube.com/embed/${trailerId}?autoplay=1`}
+                title={`${selectedMovie.Title} trailer`}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            )}
+          </div>
+
+          <div className="movie-search__detail">
+            {detailLoading && (
+              <p className="movie-search__detail-status">Loading details…</p>
+            )}
+            {!detailLoading && detailError && (
+              <p className="movie-search__detail-status">{detailError}</p>
+            )}
+            {!detailLoading && !detailError && movieDetail && (
+              <>
+                <div className="movie-search__detail-meta">
+                  {movieDetail.Year && movieDetail.Year !== "N/A" && (
+                    <span>{movieDetail.Year}</span>
+                  )}
+                  {movieDetail.Type === "series" &&
+                    movieDetail.totalSeasons &&
+                    movieDetail.totalSeasons !== "N/A" && (
+                      <span>
+                        {movieDetail.totalSeasons} Season
+                        {movieDetail.totalSeasons === "1" ? "" : "s"}
+                      </span>
+                    )}
+                  {movieDetail.Runtime && movieDetail.Runtime !== "N/A" && (
+                    <span>{movieDetail.Runtime}</span>
+                  )}
+                  {movieDetail.Rated && movieDetail.Rated !== "N/A" && (
+                    <span className="movie-search__badge">{movieDetail.Rated}</span>
+                  )}
+                  {movieDetail.imdbRating && movieDetail.imdbRating !== "N/A" && (
+                    <span className="movie-search__badge movie-search__badge--gold">
+                      ★ {movieDetail.imdbRating}
+                    </span>
+                  )}
+                </div>
+
+                {movieDetail.Plot && movieDetail.Plot !== "N/A" && (
+                  <p className="movie-search__detail-plot">{movieDetail.Plot}</p>
+                )}
+
+                <div className="movie-search__detail-facts">
+                  {movieDetail.Actors && movieDetail.Actors !== "N/A" && (
+                    <p>
+                      <span className="movie-search__detail-label">Cast:</span>{" "}
+                      {movieDetail.Actors}
+                    </p>
+                  )}
+                  {movieDetail.Genre && movieDetail.Genre !== "N/A" && (
+                    <p>
+                      <span className="movie-search__detail-label">Genres:</span>{" "}
+                      {movieDetail.Genre}
+                    </p>
+                  )}
+                  {movieDetail.Director && movieDetail.Director !== "N/A" && (
+                    <p>
+                      <span className="movie-search__detail-label">Director:</span>{" "}
+                      {movieDetail.Director}
+                    </p>
+                  )}
+                </div>
+
+                {movieDetail.Type === "series" &&
+                  movieDetail.totalSeasons &&
+                  movieDetail.totalSeasons !== "N/A" && (
+                    <div className="movie-search__episodes">
+                      <div className="movie-search__episodes-header">
+                        <h3>Episodes</h3>
+                        <select
+                          value={selectedSeason}
+                          onChange={(e) => handleSeasonChange(e.target.value)}
+                        >
+                          {Array.from(
+                            { length: parseInt(movieDetail.totalSeasons, 10) },
+                            (_, i) => i + 1
+                          ).map((s) => (
+                            <option key={s} value={s}>
+                              Season {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {episodesLoading && (
+                        <p className="movie-search__detail-status">Loading episodes…</p>
+                      )}
+
+                      {!episodesLoading && episodes.length > 0 && (
+                        <ul className="movie-search__episode-list">
+                          {episodes.map((ep) => (
+                            <li key={ep.imdbID || ep.Episode} className="movie-search__episode">
+                              <span className="movie-search__episode-number">
+                                {ep.Episode}
+                              </span>
+                              <div className="movie-search__episode-info">
+                                <p className="movie-search__episode-title">{ep.Title}</p>
+                                <p className="movie-search__episode-meta">
+                                  {ep.Released && ep.Released !== "N/A" ? ep.Released : ""}
+                                  {ep.imdbRating && ep.imdbRating !== "N/A"
+                                    ? ` · ★ ${ep.imdbRating}`
+                                    : ""}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {!episodesLoading && episodes.length === 0 && (
+                        <p className="movie-search__detail-status">
+                          No episode data for this season.
+                        </p>
+                      )}
+                    </div>
+                  )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {!searched && !activeLoading && (
         <h2 className="movie-search__section-title">Popular Right Now</h2>
       )}
@@ -370,7 +703,21 @@ export default function MovieSearch() {
       {!activeLoading && !error && filteredMovies.length > 0 && (
         <div className="movie-search__grid">
           {filteredMovies.map((movie) => (
-            <div key={movie.imdbID} className="movie-card">
+            <div
+              key={movie.imdbID}
+              className={`movie-card ${
+                selectedMovie?.imdbID === movie.imdbID ? "movie-card--selected" : ""
+              }`}
+              onClick={() => selectMovie(movie)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  selectMovie(movie);
+                }
+              }}
+            >
               <div className="movie-card__poster">
                 {movie.Poster !== "N/A" ? (
                   <img src={movie.Poster} alt={movie.Title} />
