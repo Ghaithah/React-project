@@ -4,23 +4,12 @@ import "./MovieSearch.css";
 const API_KEY = "7894ef1b"; // get one free at https://www.omdbapi.com/apikey.aspx
 const DEBOUNCE_MS = 400;
 
-// YouTube Data API v3 key, used to look up each movie's trailer.
-// Get a free one at https://console.cloud.google.com/:
-//   1. Create (or select) a project
-//   2. APIs & Services -> Library -> enable "YouTube Data API v3"
-//   3. APIs & Services -> Credentials -> Create Credentials -> API key
-// Paste the key below.
+
 const YOUTUBE_API_KEY = "AIzaSyA-rxBgD7E1QSbKsw-GrBwccVcJRyNsZIA";
 
-// OMDb's search endpoint (s=) only returns Title, Year, imdbID, Type, Poster.
-// Genre and imdbRating require a separate detail lookup (i=imdbID) per title,
-// which is why they're fetched lazily below rather than up front.
 
-// Curated picks shown as soon as the visitor lands on the page (before they've
-// typed anything), so the screen isn't empty — similar to a Netflix homepage.
-// OMDb has no "trending"/"popular" endpoint, so this is a hand-picked list of
-// well-known titles across genres/types, fetched via the detail endpoint
-// (which already includes Genre + imdbRating, unlike the search endpoint).
+
+
 const FEATURED_IDS = [
   "tt1375666", // Inception
   "tt0468569", // The Dark Knight
@@ -51,17 +40,11 @@ function parseStartYear(yearField) {
   return match ? parseInt(match[0], 10) : null;
 }
 
-// OMDb only offers two plot lengths — "short" (one terse sentence) and
-// "full" (which can run to a long paragraph). Neither lands in between, so
-// we fetch "full" and keep the first few complete sentences here, stopping
-// at a period rather than cutting mid-word/mid-sentence with an ellipsis.
+
 const PLOT_MAX_LENGTH = 320;
 const PLOT_MAX_SENTENCES = 3;
 
-// Abbreviations like "L.A." or "Mr." contain periods that aren't sentence
-// endings. Swap those periods for a placeholder before splitting on
-// sentence punctuation, then swap them back in the kept result — otherwise
-// "...back to L." / "A., fugitive..." gets split as two fake sentences.
+
 const ABBREVIATIONS = /\b(?:[A-Z]\.){2,}|\b(?:Mr|Mrs|Ms|Dr|Jr|Sr|St|vs|etc)\./g;
 const PERIOD_PLACEHOLDER = "\u0000";
 
@@ -144,10 +127,7 @@ export default function MovieSearch() {
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerError, setTrailerError] = useState("");
 
-  // Full title details (rating, runtime, cast, plot, etc.) + episode browser
-  // for series, shown alongside the trailer — OMDb's "i=" detail lookup with
-  // plot=full covers everything Netflix-style cards show except content
-  // warnings and mood tags, which no free movie API provides.
+  
   const [movieDetail, setMovieDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
@@ -225,11 +205,7 @@ export default function MovieSearch() {
       });
   }, [debouncedQuery]);
 
-  // --- Background enrichment: fetch Genre + imdbRating per search result ---
-  // Runs after search results land, so genre filtering and rating sort
-  // become available a beat after the grid first appears. Browse picks
-  // already carry this data from the detail lookup above, so they're
-  // untouched by this effect.
+  
   useEffect(() => {
     const needsDetail = movies.filter((m) => m.Genre === null);
     if (needsDetail.length === 0) return;
@@ -330,10 +306,7 @@ export default function MovieSearch() {
     setYearMax("");
   }
 
-  // --- Trailer selection ---
-  // Clicking a movie shows its trailer above the grid. Clicking a different
-  // movie clears whatever trailer is playing and loads the new one. Results
-  // are cached per imdbID so re-clicking the same poster doesn't re-fetch.
+  
   function selectMovie(movie) {
     setSelectedMovie(movie);
     setTrailerId(null);
