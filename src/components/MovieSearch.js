@@ -46,7 +46,7 @@ const PLOT_MAX_SENTENCES = 3;
 
 
 const ABBREVIATIONS = /\b(?:[A-Z]\.){2,}|\b(?:Mr|Mrs|Ms|Dr|Jr|Sr|St|vs|etc)\./g;
-const PERIOD_PLACEHOLDER = "\u0000";
+const PERIOD_PLACEHOLDER = "";
 
 function truncatePlot(text) {
   if (!text) return text;
@@ -127,7 +127,7 @@ export default function MovieSearch() {
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerError, setTrailerError] = useState("");
 
-  
+
   const [movieDetail, setMovieDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
@@ -143,6 +143,7 @@ export default function MovieSearch() {
   const detailCache = useRef({}); // imdbID -> detail object | null
   const episodesRequestId = useRef(0);
   const episodesCache = useRef({}); // "imdbID:season" -> episodes array
+  const trailerSectionRef = useRef(null); // scroll target: the trailer panel at the top of the page
 
   // --- Load the curated "browse" picks once, on mount ---
   useEffect(() => {
@@ -205,7 +206,7 @@ export default function MovieSearch() {
       });
   }, [debouncedQuery]);
 
-  
+
   useEffect(() => {
     const needsDetail = movies.filter((m) => m.Genre === null);
     if (needsDetail.length === 0) return;
@@ -306,7 +307,19 @@ export default function MovieSearch() {
     setYearMax("");
   }
 
-  
+  // Scrolls the trailer panel into view. Runs whenever a movie is selected,
+  // so it also re-centers if the visitor had scrolled further down the grid
+  // before clicking a different title.
+  useEffect(() => {
+    if (!selectedMovie) return;
+    if (trailerSectionRef.current) {
+      trailerSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [selectedMovie]);
+
+
   function selectMovie(movie) {
     setSelectedMovie(movie);
     setTrailerId(null);
@@ -532,7 +545,7 @@ export default function MovieSearch() {
       </div>
 
       {selectedMovie && (
-        <div className="movie-search__trailer">
+        <div className="movie-search__trailer" ref={trailerSectionRef}>
           <div className="movie-search__trailer-header">
             <h2>
               {selectedMovie.Title}{" "}
