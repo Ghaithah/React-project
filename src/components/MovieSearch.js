@@ -1,14 +1,28 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import "./MovieSearch.css";
 
-const API_KEY = "7894ef1b"; // get one free at https://www.omdbapi.com/apikey.aspx
+// Both keys are read from environment variables so real credentials never
+// live in source control. Create a `.env` file in the project root
+// (already gitignored by Create React App's default .gitignore) with:
+//   REACT_APP_OMDB_API_KEY=your_omdb_key
+//   REACT_APP_YOUTUBE_API_KEY=your_youtube_key
+// Get a free OMDb key at https://www.omdbapi.com/apikey.aspx and a YouTube
+// Data API v3 key at https://console.cloud.google.com/apis/credentials.
+// See .env.example for the full template. Restart `npm start` after
+// creating/editing .env — CRA only reads it at server startup.
+const API_KEY = process.env.REACT_APP_OMDB_API_KEY;
 const DEBOUNCE_MS = 400;
 
+const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
 
-const YOUTUBE_API_KEY = "AIzaSyA-rxBgD7E1QSbKsw-GrBwccVcJRyNsZIA";
-
-
-
+if (process.env.NODE_ENV !== "production" && (!API_KEY || !YOUTUBE_API_KEY)) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "Missing REACT_APP_OMDB_API_KEY and/or REACT_APP_YOUTUBE_API_KEY. " +
+      "Copy .env.example to .env, fill in real keys, and restart the dev server."
+  );
+}
 
 const FEATURED_IDS = [
   "tt1375666", // Inception
@@ -23,6 +37,56 @@ const FEATURED_IDS = [
   "tt4574334", // Stranger Things
   "tt7366338", // Chernobyl
   "tt0903747", // Breaking Bad
+];
+
+// A secondary catalog used only to power the "You Might Also Like" panel.
+// OMDb's search endpoint only matches on title text — there is no
+// genre/actor/director discovery endpoint on the free API — so "similar"
+// titles are computed client-side by genre/director overlap against a
+// curated pool of well-known titles spanning many genres, rather than a
+// live query. It's fetched once in the background, separately from the
+// featured browse picks above. Kept fairly wide (~38 titles) so the row
+// still surfaces good multi-genre matches even after raising the display
+// cap below — a bigger candidate pool matters more than the cap itself.
+const SIMILAR_POOL_IDS = [
+  "tt0109830", // Forrest Gump
+  "tt0068646", // The Godfather
+  "tt0071562", // The Godfather Part II
+  "tt0133093", // The Matrix
+  "tt0099685", // Goodfellas
+  "tt0114369", // Se7en
+  "tt0102926", // The Silence of the Lambs
+  "tt0120737", // The Fellowship of the Ring
+  "tt0245429", // Spirited Away
+  "tt0110357", // The Lion King
+  "tt2582802", // Whiplash
+  "tt0361748", // Inglourious Basterds
+  "tt0993846", // The Wolf of Wall Street
+  "tt0119217", // Good Will Hunting
+  "tt0407887", // The Departed
+  "tt0338013", // Eternal Sunshine of the Spotless Mind
+  "tt0088763", // Back to the Future
+  "tt0209144", // Memento
+  "tt0172495", // Gladiator
+  "tt0081505", // The Shining
+  "tt0078748", // Alien
+  "tt0107048", // Groundhog Day
+  "tt0120815", // Saving Private Ryan
+  "tt0475784", // Westworld
+  "tt0076759", // Star Wars: A New Hope
+  "tt0080684", // The Empire Strikes Back
+  "tt0086190", // Return of the Jedi
+  "tt0107290", // Jurassic Park
+  "tt0114814", // The Usual Suspects
+  "tt0180093", // Requiem for a Dream
+  "tt0264464", // Catch Me If You Can
+  "tt2015381", // Guardians of the Galaxy
+  "tt0117951", // Trainspotting
+  "tt7286456", // Joker
+  "tt1130884", // Shutter Island
+  "tt2380307", // Coco
+  "tt0435761", // Toy Story 3
+  "tt1049413", // Up
 ];
 
 function useDebouncedValue(value, delay) {
@@ -46,7 +110,9 @@ const PLOT_MAX_SENTENCES = 3;
 
 
 const ABBREVIATIONS = /\b(?:[A-Z]\.){2,}|\b(?:Mr|Mrs|Ms|Dr|Jr|Sr|St|vs|etc)\./g;
-const PERIOD_PLACEHOLDER = "";
+// A token that will never occur naturally in plot text and contains no
+// control characters, so it survives string storage/transport untouched.
+const PERIOD_PLACEHOLDER = "@@PERIOD@@";
 
 function truncatePlot(text) {
   if (!text) return text;
@@ -79,6 +145,7 @@ function parseDetailToMovie(detail) {
     Type: detail.Type,
     Poster: detail.Poster,
     Genre: detail.Genre || "",
+    Director: detail.Director || "",
     imdbRating:
       detail.imdbRating && detail.imdbRating !== "N/A"
         ? parseFloat(detail.imdbRating)
@@ -109,10 +176,19 @@ export default function MovieSearch() {
   const [enriching, setEnriching] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Browse mode: what's shown before the visitor searches for anything.
   const [browseMovies, setBrowseMovies] = useState([]);
   const [browseLoading, setBrowseLoading] = useState(true);
+
+  // Background pool used only for "You Might Also Like" matching (see
+  // SIMILAR_POOL_IDS above). Never rendered directly, so it has no loading
+  // state of its own — the similar-titles section just stays empty until it
+  // (and/or browseMovies) resolve.
+  const [similarPool, setSimilarPool] = useState([]);
 
   const [showFilters, setShowFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState("");
@@ -122,6 +198,11 @@ export default function MovieSearch() {
   const [sortBy, setSortBy] = useState("relevance");
 
   // Trailer player: which movie is selected, and the YouTube video id for it.
+  // Selection lives in the URL (a `?movie=<imdbID>` query param) rather than
+  // plain component state, so a selected trailer is shareable/bookmarkable
+  // and the browser back button closes it instead of leaving the page.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedId = searchParams.get("movie");
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [trailerId, setTrailerId] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
@@ -144,6 +225,7 @@ export default function MovieSearch() {
   const episodesRequestId = useRef(0);
   const episodesCache = useRef({}); // "imdbID:season" -> episodes array
   const trailerSectionRef = useRef(null); // scroll target: the trailer panel at the top of the page
+  const pendingMovieRef = useRef(null); // movie object from the click that's about to become selectedId
 
   // --- Load the curated "browse" picks once, on mount ---
   useEffect(() => {
@@ -169,13 +251,44 @@ export default function MovieSearch() {
     };
   }, []);
 
-  // --- Search (debounced, fires as the user types) ---
+  // --- Load the "similar titles" matching pool once, on mount ---
+  // Independent from the browse-picks fetch above so a slow/failed request
+  // here never blocks the main browse grid from showing.
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all(
+      SIMILAR_POOL_IDS.map((id) =>
+        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}`)
+          .then((res) => res.json())
+          .catch(() => null)
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const parsed = results
+        .filter((d) => d && d.Response !== "False")
+        .map(parseDetailToMovie);
+      setSimilarPool(parsed);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // --- Search (debounced, fires as the user types) --- fetches page 1 only;
+  // loadMoreResults() below fetches subsequent pages on demand. OMDb's
+  // search endpoint always paginates in blocks of 10 regardless of how many
+  // titles actually match, so without pagination a broad query like
+  // "Batman" silently hides everything past the first 10 results.
   useEffect(() => {
     const q = debouncedQuery.trim();
     if (!q) {
       setMovies([]);
       setSearched(false);
       setError("");
+      setPage(1);
+      setTotalResults(0);
       return;
     }
 
@@ -183,23 +296,27 @@ export default function MovieSearch() {
     setLoading(true);
     setSearched(true);
     setError("");
+    setPage(1);
 
-    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(q)}`)
+    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(q)}&page=1`)
       .then((res) => res.json())
       .then((data) => {
         if (requestId !== searchRequestId.current) return; // stale response, ignore
 
         if (data.Response === "False") {
           setMovies([]);
+          setTotalResults(0);
           setError(data.Error || "No results found.");
         } else {
           setMovies(data.Search.map((m) => ({ ...m, Genre: null, imdbRating: null })));
+          setTotalResults(parseInt(data.totalResults, 10) || 0);
         }
       })
       .catch(() => {
         if (requestId !== searchRequestId.current) return;
         setError("Something went wrong fetching movies.");
         setMovies([]);
+        setTotalResults(0);
       })
       .finally(() => {
         if (requestId === searchRequestId.current) setLoading(false);
@@ -229,6 +346,7 @@ export default function MovieSearch() {
           return {
             ...movie,
             Genre: detail.Genre || "",
+            Director: detail.Director || "",
             imdbRating: detail.imdbRating && detail.imdbRating !== "N/A" ? parseFloat(detail.imdbRating) : null,
           };
         })
@@ -246,6 +364,11 @@ export default function MovieSearch() {
   // something, otherwise the curated browse picks.
   const activeMovies = searched ? movies : browseMovies;
   const activeLoading = searched ? loading : browseLoading;
+
+  // Only search mode paginates — the curated browse grid is a fixed list.
+  // Filters apply client-side to whatever pages have been fetched so far,
+  // so "more to load" is judged against the raw (unfiltered) result count.
+  const hasMore = searched && !loading && movies.length > 0 && movies.length < totalResults;
 
   // --- Derived: genre options available so far ---
   const genreOptions = useMemo(() => {
@@ -307,6 +430,44 @@ export default function MovieSearch() {
     setYearMax("");
   }
 
+  // Fetches the next page (10 more) of the current search and appends them.
+  // Shares searchRequestId with the main search effect so that typing a new
+  // query while a "load more" fetch is in flight invalidates the stale one.
+  function loadMoreResults() {
+    const q = debouncedQuery.trim();
+    if (!q || loadingMore) return;
+
+    const nextPage = page + 1;
+    const requestId = ++searchRequestId.current;
+    setLoadingMore(true);
+
+    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(q)}&page=${nextPage}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (requestId !== searchRequestId.current) return; // a newer search superseded this one
+        if (data.Response === "False" || !data.Search) return;
+
+        setMovies((prev) => {
+          const seen = new Set(prev.map((m) => m.imdbID));
+          const additions = data.Search.filter((m) => !seen.has(m.imdbID)).map((m) => ({
+            ...m,
+            Genre: null,
+            imdbRating: null,
+          }));
+          return [...prev, ...additions];
+        });
+        setPage(nextPage);
+        setTotalResults(parseInt(data.totalResults, 10) || totalResults);
+      })
+      .catch(() => {
+        // Leave the list as-is — the button just stays visible so the
+        // visitor can try again.
+      })
+      .finally(() => {
+        setLoadingMore(false);
+      });
+  }
+
   // Scrolls the trailer panel into view. Runs whenever a movie is selected,
   // so it also re-centers if the visitor had scrolled further down the grid
   // before clicking a different title.
@@ -320,7 +481,80 @@ export default function MovieSearch() {
   }, [selectedMovie]);
 
 
-  function selectMovie(movie) {
+  // Called from a movie card click/Enter — just updates the URL. Stashing
+  // the clicked movie object in a ref lets the resolution effect below use
+  // it immediately instead of re-fetching data we already have in hand.
+  function openMovie(movie) {
+    pendingMovieRef.current = movie;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("movie", movie.imdbID);
+      return next;
+    });
+  }
+
+  // Reacts to the `movie` URL param, whichever way it changed: a card
+  // click (openMovie, above), the browser back/forward buttons, or landing
+  // directly on a `?movie=<imdbID>` link. Resolves the imdbID into a movie
+  // object — preferring data already on hand — then hands off to
+  // openResolvedMovie to actually fetch the trailer/detail.
+  useEffect(() => {
+    if (!selectedId) {
+      // Closed (X button, or navigated back past the selection).
+      trailerRequestId.current++; // invalidate any in-flight fetches
+      detailRequestId.current++;
+      episodesRequestId.current++;
+      setSelectedMovie(null);
+      setTrailerId(null);
+      setTrailerError("");
+      setTrailerLoading(false);
+      setMovieDetail(null);
+      setDetailError("");
+      setDetailLoading(false);
+      setEpisodes([]);
+      setSelectedSeason(1);
+      setEpisodesLoading(false);
+      pendingMovieRef.current = null;
+      return;
+    }
+
+    const fromClick =
+      pendingMovieRef.current?.imdbID === selectedId ? pendingMovieRef.current : null;
+    pendingMovieRef.current = null;
+
+    const known = fromClick || activeMovies.find((m) => m.imdbID === selectedId);
+    if (known) {
+      openResolvedMovie(known);
+      return;
+    }
+
+    // Not in the currently loaded browse/search list — this is a deep link
+    // or a page refresh with the param already in the URL. Fetch a minimal
+    // record directly by imdbID so the trailer panel still has a
+    // title/year/poster to show.
+    let cancelled = false;
+    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${selectedId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.Response === "False") {
+          setTrailerError(data.Error || "Couldn't find that title.");
+          return;
+        }
+        openResolvedMovie(parseDetailToMovie(data));
+      })
+      .catch(() => {
+        if (!cancelled) setTrailerError("Couldn't load that title.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  // Does the actual trailer + detail fetching for a resolved movie object.
+  function openResolvedMovie(movie) {
     setSelectedMovie(movie);
     setTrailerId(null);
     setTrailerError("");
@@ -448,21 +682,64 @@ export default function MovieSearch() {
     if (selectedMovie) fetchEpisodes(selectedMovie.imdbID, s);
   }
 
+  // Just clears the URL param — the resolution effect above handles
+  // resetting all the trailer/detail state once selectedId goes null.
+  // `replace: true` so closing via the X button doesn't leave a "no movie"
+  // entry in history (that would make the back button appear to do
+  // nothing on the first press).
   function closeTrailer() {
-    trailerRequestId.current++; // invalidate any in-flight fetches
-    detailRequestId.current++;
-    episodesRequestId.current++;
-    setSelectedMovie(null);
-    setTrailerId(null);
-    setTrailerError("");
-    setTrailerLoading(false);
-    setMovieDetail(null);
-    setDetailError("");
-    setDetailLoading(false);
-    setEpisodes([]);
-    setSelectedSeason(1);
-    setEpisodesLoading(false);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("movie");
+        return next;
+      },
+      { replace: true }
+    );
   }
+
+  // --- "You Might Also Like" ---
+  // Scored by genre overlap (plus a small bonus for a shared director)
+  // against every title the app currently knows the genre for: the curated
+  // browse picks, the dedicated similar-titles pool, and any already-
+  // enriched search results from this session. See SIMILAR_POOL_IDS for why
+  // this isn't a live discovery query.
+  const similarTitles = useMemo(() => {
+    if (!movieDetail || !movieDetail.Genre || movieDetail.Genre === "N/A") return [];
+
+    const targetGenres = new Set(
+      movieDetail.Genre.split(",").map((g) => g.trim()).filter(Boolean)
+    );
+    if (targetGenres.size === 0) return [];
+
+    const targetDirector =
+      movieDetail.Director && movieDetail.Director !== "N/A"
+        ? movieDetail.Director.trim()
+        : null;
+
+    const candidates = new Map();
+    [...browseMovies, ...similarPool, ...movies].forEach((m) => {
+      if (m.imdbID && m.Genre && !candidates.has(m.imdbID)) {
+        candidates.set(m.imdbID, m);
+      }
+    });
+    candidates.delete(movieDetail.imdbID);
+
+    const scored = [];
+    candidates.forEach((m) => {
+      const genres = m.Genre.split(",").map((g) => g.trim()).filter(Boolean);
+      const shared = genres.filter((g) => targetGenres.has(g)).length;
+      if (shared === 0) return;
+      const directorBonus = targetDirector && m.Director === targetDirector ? 1 : 0;
+      scored.push({ movie: m, score: shared + directorBonus });
+    });
+
+    scored.sort(
+      (a, b) => b.score - a.score || (b.movie.imdbRating ?? -1) - (a.movie.imdbRating ?? -1)
+    );
+
+    return scored.slice(0, 10).map((s) => s.movie);
+  }, [movieDetail, browseMovies, similarPool, movies]);
 
   return (
     <div className="movie-search">
@@ -697,6 +974,46 @@ export default function MovieSearch() {
                       )}
                     </div>
                   )}
+
+                {similarTitles.length > 0 && (
+                  <div className="movie-search__similar">
+                    <h3 className="movie-search__similar-title">You Might Also Like</h3>
+                    <div className="movie-search__similar-row">
+                      {similarTitles.map((m) => (
+                        <div
+                          key={m.imdbID}
+                          className="movie-search__similar-card"
+                          onClick={() => openMovie(m)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              openMovie(m);
+                            }
+                          }}
+                        >
+                          <div className="movie-search__similar-poster">
+                            {m.Poster !== "N/A" ? (
+                              <img
+                                src={m.Poster}
+                                alt={m.Title}
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <div className="movie-search__similar-poster-placeholder">
+                                No image
+                              </div>
+                            )}
+                          </div>
+                          <p className="movie-search__similar-card-title">{m.Title}</p>
+                          <p className="movie-search__similar-card-meta">{m.Year}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -731,25 +1048,35 @@ export default function MovieSearch() {
 
       {!activeLoading && !error && filteredMovies.length > 0 && (
         <div className="movie-search__grid">
-          {filteredMovies.map((movie) => (
+          {filteredMovies.map((movie, index) => (
             <div
               key={movie.imdbID}
               className={`movie-card ${
                 selectedMovie?.imdbID === movie.imdbID ? "movie-card--selected" : ""
               }`}
-              onClick={() => selectMovie(movie)}
+              onClick={() => openMovie(movie)}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  selectMovie(movie);
+                  openMovie(movie);
                 }
               }}
             >
               <div className="movie-card__poster">
                 {movie.Poster !== "N/A" ? (
-                  <img src={movie.Poster} alt={movie.Title} />
+                  <img
+                    src={movie.Poster}
+                    alt={movie.Title}
+                    // The first couple of rows are visible immediately on
+                    // load, so they fetch eagerly (avoids a pop-in flash
+                    // above the fold); everything below lazy-loads only as
+                    // the visitor scrolls near it, which keeps the initial
+                    // page weight down on grids of dozens of posters.
+                    loading={index < 4 ? "eager" : "lazy"}
+                    decoding="async"
+                  />
                 ) : (
                   <div className="movie-card__poster-placeholder">No image</div>
                 )}
@@ -765,6 +1092,19 @@ export default function MovieSearch() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {hasMore && (
+        <div className="movie-search__load-more">
+          <button
+            type="button"
+            className="movie-search__load-more-btn"
+            onClick={loadMoreResults}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading…" : `Load more (${movies.length} of ${totalResults})`}
+          </button>
         </div>
       )}
 

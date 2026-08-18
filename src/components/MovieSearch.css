@@ -430,6 +430,106 @@
   color: var(--muted);
 }
 
+/* --- Similar titles ("You Might Also Like") --- */
+
+.movie-search__similar {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__similar-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin: 0 0 12px;
+}
+
+.movie-search__similar-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  /* Fades the last ~48px of the row so a partially-cut-off poster reads as
+     "scroll for more" rather than the row just ending abruptly. Harmless
+     when the row doesn't overflow — it fades blank space, not content. */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+}
+
+.movie-search__similar-row::-webkit-scrollbar {
+  height: 6px;
+}
+
+.movie-search__similar-row::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.movie-search__similar-card {
+  flex: none;
+  width: 110px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__similar-card:hover {
+  box-shadow: 0 8px 20px rgba(232, 176, 75, 0.12);
+  border-color: var(--gold-dim);
+  transform: translateY(-2px);
+}
+
+.movie-search__similar-poster {
+  aspect-ratio: 2 / 3;
+  background: var(--surface-2);
+}
+
+.movie-search__similar-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.movie-search__similar-poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-align: center;
+  padding: 4px;
+}
+
+.movie-search__similar-card-title {
+  margin: 8px 8px 2px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.movie-search__similar-card-meta {
+  margin: 0 8px 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
 /* --- Section heading (used for the "Popular Right Now" browse grid) --- */
 
 .movie-search__section-title {
@@ -534,6 +634,36 @@
   text-transform: capitalize;
 }
 
+/* --- Load more (search pagination) --- */
+
+.movie-search__load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.movie-search__load-more-btn {
+  padding: 10px 28px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.movie-search__load-more-btn:hover:not(:disabled) {
+  background: rgba(232, 176, 75, 0.1);
+}
+
+.movie-search__load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* --- Skeleton loading state --- */
 
 .movie-card--skeleton {
@@ -568,7 +698,9 @@
 /* ---- Motion respect ---- */
 @media (prefers-reduced-motion: reduce) {
   .movie-card,
-  .movie-search__filter-toggle {
+  .movie-search__filter-toggle,
+  .movie-search__load-more-btn,
+  .movie-search__similar-card {
     transition: none;
   }
 }
