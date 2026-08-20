@@ -1,0 +1,936 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+.movie-search {
+  --bg: #0d0f14;
+  --surface: #14181f;
+  --surface-2: #1c212b;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+  --crimson: #e2645a;
+
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.movie-search__title {
+  text-align: center;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 0 0 14px;
+  color: var(--cream);
+}
+
+/* Filmstrip sprocket-hole divider — echoes the login card motif */
+.movie-search__title::after {
+  content: "";
+  display: block;
+  width: 140px;
+  height: 14px;
+  margin: 14px auto 0;
+  background-image: radial-gradient(circle, var(--bg) 3.5px, transparent 4px);
+  background-size: 20px 14px;
+  background-position: 10px center;
+  background-color: var(--surface-2);
+  border-radius: 3px;
+}
+
+/* --- Controls: search + filter toggle --- */
+
+.movie-search__controls {
+  margin-bottom: 24px;
+}
+
+.movie-search__search-row {
+  display: flex;
+  gap: 12px;
+}
+
+.movie-search__input {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--cream);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.movie-search__input::placeholder {
+  color: #5b6272;
+}
+
+.movie-search__input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(232, 176, 75, 0.18);
+}
+
+.movie-search__filter-toggle {
+  padding: 0 20px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__filter-toggle:hover {
+  background: rgba(232, 176, 75, 0.1);
+}
+
+.movie-search__filter-toggle.is-active {
+  background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
+  color: #1a1400;
+  border-color: var(--gold);
+}
+
+/* --- Filters panel --- */
+
+.movie-search__filters {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.movie-search__filter-field {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  gap: 6px;
+}
+
+.movie-search__filter-field select,
+.movie-search__filter-field input {
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cream);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+
+.movie-search__filter-field select:focus,
+.movie-search__filter-field input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(232, 176, 75, 0.16);
+}
+
+.movie-search__hint {
+  font-weight: 400;
+  text-transform: none;
+  color: var(--gold-dim);
+  font-style: italic;
+}
+
+.movie-search__clear {
+  grid-column: 1 / -1;
+  justify-self: start;
+  background: none;
+  border: none;
+  color: var(--gold);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.movie-search__clear:hover {
+  color: #f2c467;
+}
+
+/* --- Trailer player --- */
+
+.movie-search__trailer {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.movie-search__trailer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.movie-search__trailer-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movie-search__trailer-year {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.movie-search__trailer-close {
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__trailer-close:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+.movie-search__trailer-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.movie-search__trailer-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.movie-search__trailer-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 0 20px;
+  text-align: center;
+}
+
+/* Skeleton placeholder shown in the trailer frame while the trailer id is
+   being resolved — a plain pulsing rectangle over the frame's black
+   background, matching the poster skeleton used in the grid below. */
+.movie-search__trailer-frame--skeleton {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-2);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+/* --- Title details (rating, runtime, cast, plot, episodes) --- */
+
+.movie-search__detail {
+  /* Everything in here should read left-to-right, not inherit the
+     center alignment set globally on .App for the CRA splash screen. */
+  text-align: left;
+  padding: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__detail-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Two columns once there's room: description on the left, quick facts
+   (cast/genres/director) as a compact list on the right — mirrors the
+   Netflix title-page layout instead of stacking everything full-width. */
+.movie-search__detail-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 620px) {
+  .movie-search__detail-body {
+    grid-template-columns: minmax(0, 1fr) 230px;
+    gap: 32px;
+  }
+}
+
+.movie-search__detail-main {
+  min-width: 0;
+}
+
+.movie-search__detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 14px;
+}
+
+.movie-search__badge {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  color: var(--cream);
+}
+
+.movie-search__badge--gold {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+.movie-search__detail-plot {
+  color: var(--cream);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.movie-search__detail-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.movie-search__detail-facts p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--cream);
+}
+
+.movie-search__detail-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+/* Clickable Cast/Director names — styled as inline text rather than a
+   button, since they sit inline inside a sentence-like fact list. */
+.movie-search__person-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__person-link:hover,
+.movie-search__person-link:focus-visible {
+  color: var(--gold);
+  border-bottom-color: var(--gold-dim);
+}
+
+.movie-search__person-link.is-active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+/* Skeleton placeholder for the detail panel — mirrors the two-column
+   layout above (plot lines + badge pills on the left, fact lines on the
+   right) so the panel doesn't visibly reflow once the real content
+   arrives. */
+.movie-search__detail-skeleton {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 620px) {
+  .movie-search__detail-skeleton {
+    grid-template-columns: minmax(0, 1fr) 230px;
+    gap: 32px;
+  }
+}
+
+.movie-search__detail-skeleton-main,
+.movie-search__detail-skeleton-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.movie-search__detail-skeleton-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.skeleton-pill {
+  width: 54px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--border);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+/* --- Cast/crew exploration ("More with <person>") --- */
+
+.movie-search__person {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__person-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.movie-search__person-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin: 0;
+}
+
+.movie-search__person-close {
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__person-close:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+/* Bio/photo card sourced from Wikipedia's summary API — a fixed-size photo
+   next to a short description + extract, capped to a few lines so one very
+   long bio can't push the filmography row far down the page. */
+.movie-search__person-bio {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.movie-search__person-bio-photo {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.movie-search__person-bio-photo--skeleton {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.movie-search__person-bio-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.movie-search__person-bio-desc {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+}
+
+.movie-search__person-bio-extract {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--cream);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.movie-search__person-bio-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.movie-search__person-bio-link:hover {
+  text-decoration: underline;
+}
+
+/* --- Episode browser --- */
+
+.movie-search__episodes {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__episodes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.movie-search__episodes-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cream);
+}
+
+.movie-search__episodes-header select {
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--cream);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+
+.movie-search__episodes-header select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(232, 176, 75, 0.16);
+}
+
+.movie-search__episode-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.movie-search__episode {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  column-gap: 14px;
+  align-items: baseline;
+  padding: 11px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.movie-search__episode:last-child {
+  border-bottom: none;
+}
+
+.movie-search__episode:hover {
+  background: var(--surface-2);
+}
+
+.movie-search__episode-number {
+  color: var(--gold-dim);
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.movie-search__episode-info {
+  min-width: 0;
+}
+
+.movie-search__episode-title {
+  margin: 0 0 3px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cream);
+}
+
+.movie-search__episode-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* --- Similar titles ("You Might Also Like") --- */
+
+.movie-search__similar {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__similar-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin: 0 0 12px;
+}
+
+.movie-search__similar-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  /* Fades the last ~48px of the row so a partially-cut-off poster reads as
+     "scroll for more" rather than the row just ending abruptly. Harmless
+     when the row doesn't overflow — it fades blank space, not content. */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+}
+
+.movie-search__similar-row::-webkit-scrollbar {
+  height: 6px;
+}
+
+.movie-search__similar-row::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.movie-search__similar-card {
+  flex: none;
+  width: 110px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__similar-card:hover {
+  box-shadow: 0 8px 20px rgba(232, 176, 75, 0.12);
+  border-color: var(--gold-dim);
+  transform: translateY(-2px);
+}
+
+.movie-search__similar-poster {
+  aspect-ratio: 2 / 3;
+  background: var(--surface-2);
+}
+
+.movie-search__similar-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.movie-search__similar-poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-align: center;
+  padding: 4px;
+}
+
+.movie-search__similar-card-title {
+  margin: 8px 8px 2px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.movie-search__similar-card-meta {
+  margin: 0 8px 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* --- Section heading (used for the "Popular Right Now" browse grid) --- */
+
+.movie-search__section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin: 0 0 12px;
+}
+
+/* --- Status text --- */
+
+.movie-search__status {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 60px;
+  font-size: 0.95rem;
+}
+
+/* --- Grid + cards --- */
+
+.movie-search__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.movie-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+
+.movie-card:hover {
+  box-shadow: 0 8px 24px rgba(232, 176, 75, 0.12);
+  border-color: var(--gold-dim);
+  transform: translateY(-2px);
+}
+
+.movie-card--selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(232, 176, 75, 0.35);
+}
+
+.movie-card__poster {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  background: var(--surface-2);
+}
+
+.movie-card__poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.movie-card__poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.movie-card__rating {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
+  color: #1a1400;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.movie-card__info {
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.movie-card__title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  margin: 0 0 4px;
+  color: var(--cream);
+}
+
+.movie-card__meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+  text-transform: capitalize;
+}
+
+/* --- Load more (search pagination / infinite scroll sentinel) --- */
+
+.movie-search__load-more {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60px;
+  margin-top: 28px;
+}
+
+/* Fallback button, only rendered when IntersectionObserver isn't available
+   (very old browsers) so pagination still works without JS scroll support. */
+.movie-search__load-more-btn {
+  padding: 10px 28px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.movie-search__load-more-btn:hover:not(:disabled) {
+  background: rgba(232, 176, 75, 0.1);
+}
+
+.movie-search__load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Shown while the next page is auto-fetching via infinite scroll. */
+.movie-search__load-more-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.movie-search__load-more-status::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--gold);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Skeleton loading state --- */
+
+.movie-card--skeleton {
+  cursor: default;
+}
+
+.movie-card__poster--skeleton {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--border);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line--title {
+  width: 75%;
+  margin-bottom: 8px;
+}
+
+.skeleton-line--meta {
+  width: 45%;
+}
+
+.skeleton-line--plot {
+  height: 12px;
+  width: 100%;
+}
+
+.skeleton-line--plot-short {
+  height: 12px;
+  width: 60%;
+}
+
+.skeleton-line--fact {
+  height: 10px;
+  width: 80%;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ---- Motion respect ---- */
+@media (prefers-reduced-motion: reduce) {
+  .movie-card,
+  .movie-search__filter-toggle,
+  .movie-search__load-more-btn,
+  .movie-search__similar-card {
+    transition: none;
+  }
+
+  .movie-card__poster--skeleton,
+  .skeleton-line,
+  .skeleton-pill,
+  .movie-search__trailer-frame--skeleton,
+  .movie-search__person-bio-photo--skeleton,
+  .movie-search__load-more-status::before {
+    animation: none;
+  }
+}

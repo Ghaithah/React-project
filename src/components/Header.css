@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+.app-header {
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --surface: #14181f;
+  --border: #282e3a;
+  --muted: #8b93a1;
+
+  background-color: var(--surface) !important;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.app-header .navbar-brand {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--gold) !important;
+  font-size: 1.4rem;
+}
+
+.app-header .nav-link {
+  color: var(--muted) !important;
+  transition: color 0.15s ease;
+}
+
+.app-header .nav-link:hover {
+  color: var(--gold) !important;
+}
+
+.app-header .nav-link.text-white {
+  color: var(--cream) !important;
+}
+
+.app-header .btn-outline-light {
+  color: var(--gold) !important;
+  border-color: var(--gold-dim) !important;
+  background: transparent;
+}
+
+.app-header .btn-outline-light:hover {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+  color: #1a1400 !important;
+}
