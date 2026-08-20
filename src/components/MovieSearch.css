@@ -250,6 +250,16 @@
   text-align: center;
 }
 
+/* Skeleton placeholder shown in the trailer frame while the trailer id is
+   being resolved — a plain pulsing rectangle over the frame's black
+   background, matching the poster skeleton used in the grid below. */
+.movie-search__trailer-frame--skeleton {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-2);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
 /* --- Title details (rating, runtime, cast, plot, episodes) --- */
 
 .movie-search__detail {
@@ -338,6 +348,175 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 2px;
+}
+
+/* Clickable Cast/Director names — styled as inline text rather than a
+   button, since they sit inline inside a sentence-like fact list. */
+.movie-search__person-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__person-link:hover,
+.movie-search__person-link:focus-visible {
+  color: var(--gold);
+  border-bottom-color: var(--gold-dim);
+}
+
+.movie-search__person-link.is-active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+/* Skeleton placeholder for the detail panel — mirrors the two-column
+   layout above (plot lines + badge pills on the left, fact lines on the
+   right) so the panel doesn't visibly reflow once the real content
+   arrives. */
+.movie-search__detail-skeleton {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 620px) {
+  .movie-search__detail-skeleton {
+    grid-template-columns: minmax(0, 1fr) 230px;
+    gap: 32px;
+  }
+}
+
+.movie-search__detail-skeleton-main,
+.movie-search__detail-skeleton-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.movie-search__detail-skeleton-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.skeleton-pill {
+  width: 54px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--border);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+/* --- Cast/crew exploration ("More with <person>") --- */
+
+.movie-search__person {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.movie-search__person-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.movie-search__person-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin: 0;
+}
+
+.movie-search__person-close {
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__person-close:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+/* Bio/photo card sourced from Wikipedia's summary API — a fixed-size photo
+   next to a short description + extract, capped to a few lines so one very
+   long bio can't push the filmography row far down the page. */
+.movie-search__person-bio {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.movie-search__person-bio-photo {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.movie-search__person-bio-photo--skeleton {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.movie-search__person-bio-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.movie-search__person-bio-desc {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+}
+
+.movie-search__person-bio-extract {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--cream);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.movie-search__person-bio-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.movie-search__person-bio-link:hover {
+  text-decoration: underline;
 }
 
 /* --- Episode browser --- */
@@ -634,14 +813,18 @@
   text-transform: capitalize;
 }
 
-/* --- Load more (search pagination) --- */
+/* --- Load more (search pagination / infinite scroll sentinel) --- */
 
 .movie-search__load-more {
   display: flex;
   justify-content: center;
+  align-items: center;
+  min-height: 60px;
   margin-top: 28px;
 }
 
+/* Fallback button, only rendered when IntersectionObserver isn't available
+   (very old browsers) so pagination still works without JS scroll support. */
 .movie-search__load-more-btn {
   padding: 10px 28px;
   border: 1px solid var(--gold-dim);
@@ -662,6 +845,29 @@
 .movie-search__load-more-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* Shown while the next page is auto-fetching via infinite scroll. */
+.movie-search__load-more-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.movie-search__load-more-status::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--gold);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* --- Skeleton loading state --- */
@@ -690,6 +896,21 @@
   width: 45%;
 }
 
+.skeleton-line--plot {
+  height: 12px;
+  width: 100%;
+}
+
+.skeleton-line--plot-short {
+  height: 12px;
+  width: 60%;
+}
+
+.skeleton-line--fact {
+  height: 10px;
+  width: 80%;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -702,5 +923,14 @@
   .movie-search__load-more-btn,
   .movie-search__similar-card {
     transition: none;
+  }
+
+  .movie-card__poster--skeleton,
+  .skeleton-line,
+  .skeleton-pill,
+  .movie-search__trailer-frame--skeleton,
+  .movie-search__person-bio-photo--skeleton,
+  .movie-search__load-more-status::before {
+    animation: none;
   }
 }
