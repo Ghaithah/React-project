@@ -28,6 +28,30 @@
   color: var(--cream);
 }
 
+/* Wraps the title text + the "KIDS" chip so they sit inline together,
+   without turning the <h1> itself into a flex container (that would
+   pull the sprocket-hole divider below into the row too). */
+.movie-search__title-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Small red "KIDS" chip shown next to the page title when the active
+   profile is the Kids profile — the same visual cue used on the profile
+   avatar itself, so it's obvious at a glance which mode is active. */
+.movie-search__kids-badge {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: #e5342e;
+  border-radius: 4px;
+  padding: 3px 8px;
+  vertical-align: middle;
+}
+
 /* Filmstrip sprocket-hole divider — echoes the login card motif */
 .movie-search__title::after {
   content: "";

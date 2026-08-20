@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useProfiles } from "./ProfileContext";
 import "./MovieSearch.css";
 
 
@@ -67,6 +68,38 @@ const BROWSE_IDS = [
   "tt5027774", // Three Billboards Outside Ebbing, Missouri
   "tt3315342", // Logan
   "tt0169547", // American Beauty
+];
+
+
+// A separate, hand-picked pool of family movies for the Kids profile's
+// "Popular Right Now" grid. Kept distinct from BROWSE_IDS rather than just
+// filtering it, because most of the general browse list (crime dramas, war
+// films, horror, etc.) has nothing kid-appropriate to filter down to.
+const KIDS_BROWSE_IDS = [
+  "tt0114709", // Toy Story
+  "tt0120363", // Toy Story 2
+  "tt0435761", // Toy Story 3
+  "tt1979376", // Toy Story 4
+  "tt0266543", // Finding Nemo
+  "tt0110357", // The Lion King
+  "tt0126029", // Shrek
+  "tt0910970", // WALL·E
+  "tt0198781", // Monsters, Inc.
+  "tt0317705", // The Incredibles
+  "tt1049413", // Up
+  "tt0382932", // Ratatouille
+  "tt2096673", // Inside Out
+  "tt2245084", // Big Hero 6
+  "tt1323594", // Despicable Me
+  "tt0892769", // How to Train Your Dragon
+  "tt0441773", // Kung Fu Panda
+  "tt2294629", // Frozen
+  "tt3521164", // Moana
+  "tt2948356", // Zootopia
+  "tt1109624", // Paddington
+  "tt2380307", // Coco
+  "tt0129167", // The Iron Giant
+  "tt0245429", // Spirited Away
 ];
 
 
@@ -181,6 +214,40 @@ function parseDetailToMovie(detail) {
 }
 
 
+// --- Kids-profile content filtering ---
+// OMDb doesn't expose a simple "kid safe" flag, so this leans on genre as a
+// practical proxy: a title has to carry at least one clearly kid-friendly
+// genre, and none of the genres that are a near-certain sign it isn't meant
+// for children. Titles whose genre hasn't loaded yet (Genre === null, before
+// enrichment finishes) are treated as not-yet-safe rather than shown
+// optimistically, so nothing inappropriate flashes on screen while it loads.
+const KID_SAFE_GENRES = [
+  "Animation",
+  "Family",
+  "Adventure",
+  "Comedy",
+  "Fantasy",
+  "Musical",
+  "Sport",
+];
+const KID_UNSAFE_GENRES = [
+  "Horror",
+  "Crime",
+  "War",
+  "Thriller",
+  "Film-Noir",
+  "Mystery",
+];
+
+function isKidSafe(movie) {
+  if (!movie || !movie.Genre) return false;
+  const genres = movie.Genre.split(",").map((g) => g.trim()).filter(Boolean);
+  if (genres.length === 0) return false;
+  if (genres.some((g) => KID_UNSAFE_GENRES.includes(g))) return false;
+  return genres.some((g) => KID_SAFE_GENRES.includes(g));
+}
+
+
 function renderPosterCard(movie, onSelect) {
   return (
     <div
@@ -224,6 +291,10 @@ const SORT_OPTIONS = [
 ];
 
 export default function MovieSearch() {
+  const { activeProfile } = useProfiles();
+  const kidsMode = !!(activeProfile && activeProfile.isKids);
+  const browseIdsSource = kidsMode ? KIDS_BROWSE_IDS : BROWSE_IDS;
+
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS);
 
@@ -290,8 +361,24 @@ export default function MovieSearch() {
   const loadMoreSentinelRef = useRef(null); // bottom-of-grid marker watched for infinite scroll
 
 
+  // Switching profiles mid-session (Kids <-> regular) should reset the
+  // browse grid back to page one of whichever pool now applies, and clear
+  // any in-flight search so nothing from the other profile lingers on
+  // screen while the new pool loads.
   useEffect(() => {
-    const idsForPage = BROWSE_IDS.slice(
+    setBrowseMovies([]);
+    setBrowsePage(0);
+    setBrowseLoading(true);
+    setQuery("");
+    setMovies([]);
+    setSearched(false);
+    setError("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kidsMode]);
+
+
+  useEffect(() => {
+    const idsForPage = browseIdsSource.slice(
       browsePage * BROWSE_PAGE_SIZE,
       (browsePage + 1) * BROWSE_PAGE_SIZE
     );
@@ -320,7 +407,8 @@ export default function MovieSearch() {
     return () => {
       cancelled = true;
     };
-  }, [browsePage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browsePage, kidsMode]);
 
 
   function loadMoreBrowse() {
@@ -439,7 +527,7 @@ export default function MovieSearch() {
 
   const searchHasMore = searched && !loading && movies.length > 0 && movies.length < totalResults;
   const browseHasMore =
-    !searched && !browseLoading && (browsePage + 1) * BROWSE_PAGE_SIZE < BROWSE_IDS.length;
+    !searched && !browseLoading && (browsePage + 1) * BROWSE_PAGE_SIZE < browseIdsSource.length;
   const hasMore = searchHasMore || browseHasMore;
   const loadingMoreAny = loadingMore || browseLoadingMore;
 
@@ -455,6 +543,8 @@ export default function MovieSearch() {
   // --- Filtering + sorting ---
   const filteredMovies = useMemo(() => {
     let list = [...activeMovies];
+
+    if (kidsMode) list = list.filter(isKidSafe);
 
     if (typeFilter) list = list.filter((m) => m.Type === typeFilter);
     if (genreFilter) {
@@ -491,7 +581,7 @@ export default function MovieSearch() {
     }
 
     return list;
-  }, [activeMovies, typeFilter, genreFilter, yearMin, yearMax, sortBy]);
+  }, [activeMovies, kidsMode, typeFilter, genreFilter, yearMin, yearMax, sortBy]);
 
   const activeFilterCount =
     (typeFilter ? 1 : 0) + (genreFilter ? 1 : 0) + (yearMin ? 1 : 0) + (yearMax ? 1 : 0);
@@ -798,6 +888,7 @@ export default function MovieSearch() {
     const candidates = new Map();
     [...browseMovies, ...similarPool, ...movies].forEach((m) => {
       if (m.imdbID && m.Genre && !candidates.has(m.imdbID)) {
+        if (kidsMode && !isKidSafe(m)) return;
         candidates.set(m.imdbID, m);
       }
     });
@@ -817,7 +908,7 @@ export default function MovieSearch() {
     );
 
     return scored.slice(0, 10).map((s) => s.movie);
-  }, [movieDetail, browseMovies, similarPool, movies]);
+  }, [movieDetail, browseMovies, similarPool, movies, kidsMode]);
 
  
   const personTitles = useMemo(() => {
@@ -827,7 +918,10 @@ export default function MovieSearch() {
 
     const candidates = new Map();
     [...browseMovies, ...similarPool, ...movies].forEach((m) => {
-      if (m.imdbID && !candidates.has(m.imdbID)) candidates.set(m.imdbID, m);
+      if (m.imdbID && !candidates.has(m.imdbID)) {
+        if (kidsMode && !isKidSafe(m)) return;
+        candidates.set(m.imdbID, m);
+      }
     });
     if (movieDetail) candidates.delete(movieDetail.imdbID);
 
@@ -842,7 +936,7 @@ export default function MovieSearch() {
 
     matches.sort((a, b) => (b.imdbRating ?? -1) - (a.imdbRating ?? -1));
     return matches;
-  }, [selectedPerson, browseMovies, similarPool, movies, movieDetail]);
+  }, [selectedPerson, browseMovies, similarPool, movies, movieDetail, kidsMode]);
 
 
   useEffect(() => {
@@ -928,8 +1022,13 @@ export default function MovieSearch() {
   }
 
   return (
-    <div className="movie-search">
-      <h1 className="movie-search__title">Movie Search</h1>
+    <div className={`movie-search ${kidsMode ? "movie-search--kids" : ""}`}>
+      <h1 className="movie-search__title">
+        <span className="movie-search__title-text">
+          {kidsMode ? "Kids Movie Search" : "Movie Search"}
+          {kidsMode && <span className="movie-search__kids-badge">KIDS</span>}
+        </span>
+      </h1>
 
       <div className="movie-search__controls">
         <div className="movie-search__search-row">
@@ -937,7 +1036,9 @@ export default function MovieSearch() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for a movie, e.g. Inception"
+            placeholder={
+              kidsMode ? "Search for a kid-friendly movie, e.g. Shrek" : "Search for a movie, e.g. Inception"
+            }
             className="movie-search__input"
           />
           <button
@@ -1286,7 +1387,9 @@ export default function MovieSearch() {
       )}
 
       {!searched && !activeLoading && (
-        <h2 className="movie-search__section-title">Popular Right Now</h2>
+        <h2 className="movie-search__section-title">
+          {kidsMode ? "Kids' Picks" : "Popular Right Now"}
+        </h2>
       )}
 
       {activeLoading && (
@@ -1307,7 +1410,9 @@ export default function MovieSearch() {
 
       {!activeLoading && !error && filteredMovies.length === 0 && activeMovies.length > 0 && (
         <p className="movie-search__status">
-          No results match your filters. Try widening the year range or clearing a filter.
+          {kidsMode
+            ? "No kid-friendly matches found. Try a different search."
+            : "No results match your filters. Try widening the year range or clearing a filter."}
         </p>
       )}
 

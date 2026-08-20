@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+.profile-select {
+  --bg: #0d0f14;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+  --gold: #e8b04b;
+  --border: #282e3a;
+
+  width: 100%;
+  min-height: 100%;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 48px 20px;
+  background:
+    radial-gradient(700px 420px at 50% 30%, rgba(232, 176, 75, 0.08), transparent 70%),
+    var(--bg);
+  font-family: 'Inter', system-ui, sans-serif;
+  text-align: center;
+}
+
+.profile-select__logo {
+  opacity: 0.9;
+}
+
+.profile-select__heading {
+  margin: 0;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+}
+
+.profile-select__grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 28px;
+  max-width: 780px;
+}
+
+.profile-select__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 110px;
+}
+
+.profile-select__avatar-wrap {
+  position: relative;
+  cursor: pointer;
+  border-radius: 12px;
+  outline: none;
+}
+
+.profile-select__avatar-wrap:hover .profile-avatar,
+.profile-select__avatar-wrap:focus-visible .profile-avatar {
+  outline: 3px solid var(--cream);
+  transform: translateY(-2px);
+}
+
+.profile-avatar {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, outline-color 0.15s ease;
+  overflow: hidden;
+}
+
+.profile-avatar__face {
+  width: 60%;
+  height: 60%;
+}
+
+.profile-avatar__badge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: #e5342e;
+  border: 1.5px solid #0d0f14;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.profile-select__edit-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 12px;
+}
+
+.profile-select__name {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.profile-select__name-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--cream);
+  background: #1c212b;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+
+.profile-select__name-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(232, 176, 75, 0.18);
+}
+
+.profile-select__manage {
+  padding: 10px 26px;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.profile-select__manage:hover {
+  color: var(--cream);
+  border-color: var(--cream);
+}
+
+@media (max-width: 480px) {
+  .profile-select__heading {
+    font-size: 2rem;
+  }
+  .profile-select__grid {
+    gap: 18px;
+  }
+  .profile-select__item {
+    width: 84px;
+  }
+  .profile-avatar {
+    width: 78px;
+    height: 78px;
+  }
+}
