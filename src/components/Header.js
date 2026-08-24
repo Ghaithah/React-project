@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { useProfiles } from './ProfileContext'
+import { getAvatar } from './Avatars'
 import Logo from './Logo'
 import './Header.css'
 
@@ -18,13 +19,27 @@ function Header(props) {
     navigate('/login');
   }
 
+  // Clicking the brand always sends you back to the top-level browse
+  // page. If a movie's trailer/detail panel was open (tracked via the
+  // ?movie= query param), navigating to the bare "/" drops that param,
+  // which MovieSearch already treats as "close the panel" — so this
+  // doubles as a reset to the top of the page, not just a route change.
+  function handleBrandClick() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   return (
     <nav className="navbar navbar-dark bg-dark app-header">
       <div className="container d-flex justify-content-between align-items-center">
-        <span className="navbar-brand mb-0 h1 d-flex align-items-center gap-2">
-        <Logo height={48} showWordmark={false} />
-        Watch & Wonder
-        </span>
+        <Link
+          to="/"
+          className="navbar-brand app-header__brand mb-0 h1 d-flex align-items-center gap-2"
+          onClick={handleBrandClick}
+          aria-label="Watch & Wonder — back to browse"
+        >
+          <Logo height={48} showWordmark={false} />
+          Watch & Wonder
+        </Link>
 
         <ul className="nav align-items-center mb-0">
           {user ? (
@@ -38,7 +53,7 @@ function Header(props) {
                       onClick={() => navigate('/profiles')}
                       title="Switch profile"
                       aria-label="Switch profile"
-                      style={{ background: activeProfile.color }}
+                      style={{ background: getAvatar(activeProfile.avatarId).color }}
                     />
                   </li>
                   {/* The greeting is keyed off the active PROFILE's name

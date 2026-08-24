@@ -21,6 +21,21 @@
   font-size: 1.4rem;
 }
 
+/* The brand is a real link now (back to the browse page) — no
+   underline, and a small opacity tell on hover/focus so it still reads
+   as clickable. */
+.app-header__brand {
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+  cursor: pointer;
+}
+
+.app-header__brand:hover,
+.app-header__brand:focus-visible {
+  opacity: 0.85;
+  text-decoration: none;
+}
+
 .app-header .nav-link {
   color: var(--muted) !important;
   transition: color 0.15s ease;

@@ -35,10 +35,10 @@
   color: var(--cream);
 }
 
-/* Shown only while "Manage Profiles" editing is active, explaining what the
-   name field feeds into (the header greeting) so it isn't a mystery text
-   box. Negative margin pulls it in closer to the heading above than the
-   container's normal 28px flex gap would otherwise leave. */
+/* Shown while "Manage Profiles" editing is active, or while a brand-new
+   account has no profiles yet, explaining what's expected. Negative
+   margin pulls it in closer to the heading above than the container's
+   normal 28px flex gap would otherwise leave. */
 .profile-select__hint {
   margin: -16px 0 0;
   max-width: 480px;
@@ -76,6 +76,32 @@
   transform: translateY(-2px);
 }
 
+/* The "Add Profile" tile — a dashed placeholder in the same slot as a
+   real avatar, shown whenever the account is under the profile cap. */
+.profile-select__avatar-wrap--add {
+  width: 100px;
+  height: 100px;
+  border-radius: 12px;
+  border: 2px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.profile-select__avatar-wrap--add:hover,
+.profile-select__avatar-wrap--add:focus-visible {
+  border-color: var(--gold);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.profile-select__add-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
 .profile-avatar {
   position: relative;
   width: 100px;
@@ -108,6 +134,9 @@
   text-transform: uppercase;
 }
 
+/* Overlay shown on top of every avatar tile while managing, signalling
+   "click to edit this profile". Pointer events pass through so the click
+   still lands on the tile underneath. */
 .profile-select__edit-badge {
   position: absolute;
   inset: 0;
@@ -118,20 +147,143 @@
   color: #fff;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 12px;
+  pointer-events: none;
+}
+
+/* Small round "delete this profile" button that sits on top of the
+   avatar tile while managing, in the opposite corner from the KIDS
+   badge so the two never collide. Sits above the edit overlay and
+   intercepts its own clicks (handler calls stopPropagation) so it
+   deletes instead of opening the edit form. */
+.profile-select__delete-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: #fff;
+  background: #e5342e;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.profile-select__delete-badge:hover {
+  background: #ff4b42;
 }
 
 .profile-select__name {
   font-size: 0.9rem;
   color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
-.profile-select__name-input {
+.profile-select__kids-tag {
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: #e5342e;
+  border-radius: 4px;
+}
+
+.profile-select__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-select__manage,
+.profile-select__delete-all {
+  padding: 10px 26px;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.profile-select__manage {
+  color: var(--muted);
+  border: 1px solid var(--muted);
+}
+
+.profile-select__manage:hover {
+  color: var(--cream);
+  border-color: var(--cream);
+}
+
+.profile-select__delete-all {
+  color: #ff8078;
+  border: 1px solid #7a2f2b;
+}
+
+.profile-select__delete-all:hover {
+  color: #fff;
+  background: #e5342e;
+  border-color: #e5342e;
+}
+
+/* --- Add/edit-a-profile form --- */
+
+.profile-create__overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 5, 8, 0.78);
+  z-index: 50;
+}
+
+.profile-create {
   width: 100%;
-  box-sizing: border-box;
-  padding: 6px 8px;
-  font: inherit;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 32px;
+  background: #14181f;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: left;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.profile-create__heading {
+  margin: 0;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 1.8rem;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+}
+
+.profile-create__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   font-size: 0.85rem;
-  text-align: center;
+  color: var(--muted);
+}
+
+.profile-create__field input[type='text'] {
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.95rem;
   color: var(--cream);
   background: #1c212b;
   border: 1px solid var(--border);
@@ -139,26 +291,119 @@
   outline: none;
 }
 
-.profile-select__name-input:focus {
+.profile-create__field input[type='text']:focus {
   border-color: var(--gold);
   box-shadow: 0 0 0 3px rgba(232, 176, 75, 0.18);
 }
 
-.profile-select__manage {
-  padding: 10px 26px;
-  font-size: 0.9rem;
-  letter-spacing: 0.03em;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid var(--muted);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+.profile-create__avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
 
-.profile-select__manage:hover {
+.profile-create__avatar-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.profile-create__avatar-option:hover {
+  transform: translateY(-1px);
+}
+
+.profile-create__avatar-option.is-selected {
+  border-color: var(--gold);
+}
+
+.profile-create__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--cream);
+  cursor: pointer;
+}
+
+.profile-create__checkbox input {
+  margin-top: 3px;
+}
+
+.profile-create__checkbox small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.profile-create__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ff8078;
+}
+
+/* Delete sits on the left, Cancel/Save on the right — keeps the
+   destructive action visually separate from the confirming ones. */
+.profile-create__buttons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-create__buttons-right {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.profile-create__cancel,
+.profile-create__save,
+.profile-create__delete {
+  padding: 10px 22px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.profile-create__cancel {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.profile-create__cancel:hover {
   color: var(--cream);
   border-color: var(--cream);
+}
+
+.profile-create__delete {
+  color: #ff8078;
+  background: transparent;
+  border: 1px solid #7a2f2b;
+}
+
+.profile-create__delete:hover {
+  color: #fff;
+  background: #e5342e;
+  border-color: #e5342e;
+}
+
+.profile-create__save {
+  color: #1a1400;
+  background: var(--gold);
+  border: 1px solid var(--gold);
+}
+
+.profile-create__save:hover {
+  background: #f2c56a;
 }
 
 @media (max-width: 480px) {
@@ -171,8 +416,23 @@
   .profile-select__item {
     width: 84px;
   }
-  .profile-avatar {
+  .profile-avatar,
+  .profile-select__avatar-wrap--add {
     width: 78px;
     height: 78px;
+  }
+  .profile-create {
+    padding: 24px;
+  }
+  .profile-create__avatar-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .profile-create__buttons {
+    flex-wrap: wrap;
+  }
+  .profile-create__buttons-right {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
   }
 }
