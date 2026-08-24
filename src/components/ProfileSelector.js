@@ -65,6 +65,12 @@ export default function ProfileSelector() {
 
       <h1 className="profile-select__heading">Who's watching?</h1>
 
+      {managing && (
+        <p className="profile-select__hint">
+          Give each profile its own username — it's what shows up in the "Welcome" greeting.
+        </p>
+      )}
+
       <div className="profile-select__grid">
         {profiles.map((p) => (
           <div key={p.id} className="profile-select__item">
@@ -90,8 +96,9 @@ export default function ProfileSelector() {
                 className="profile-select__name-input"
                 value={p.name}
                 maxLength={20}
+                placeholder="Enter a username"
                 onChange={(e) => renameProfile(p.id, e.target.value)}
-                aria-label={`Rename ${p.name}`}
+                aria-label="Profile username"
               />
             ) : (
               <span className="profile-select__name">{p.name}</span>

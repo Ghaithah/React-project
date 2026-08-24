@@ -30,24 +30,26 @@ function Header(props) {
           {user ? (
             <>
               {activeProfile && !isProfilesPage && (
-                <li className="nav-item">
-                  <button
-                    type="button"
-                    className="app-header__profile-chip"
-                    onClick={() => navigate('/profiles')}
-                    title="Switch profile"
-                  >
-                    <span
-                      className="app-header__profile-dot"
+                <>
+                  <li className="nav-item">
+                    <button
+                      type="button"
+                      className="app-header__profile-avatar"
+                      onClick={() => navigate('/profiles')}
+                      title="Switch profile"
+                      aria-label="Switch profile"
                       style={{ background: activeProfile.color }}
                     />
-                    {activeProfile.name}
-                  </button>
-                </li>
+                  </li>
+                  {/* The greeting is keyed off the active PROFILE's name
+                      (e.g. "Courtney"), not the account's login email —
+                      each profile sets its own display name from the
+                      "Who's watching?" screen. */}
+                  <li className="nav-item">
+                    <span className="nav-link text-white">Welcome, {activeProfile.name}</span>
+                  </li>
+                </>
               )}
-              <li className="nav-item">
-                <span className="nav-link text-white">Welcome, {user}</span>
-              </li>
               <li className="nav-item">
                 <button className="btn btn-outline-light btn-sm" onClick={handleLogout}>
                  Logout

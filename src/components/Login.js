@@ -5,7 +5,7 @@ import './Login.css';
 
 function Login() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,8 +24,8 @@ function Login() {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password) {
-      setError('Please fill in both fields.');
+    if (!email.trim() || !password) {
+      setError('Please enter both your email and password.');
       return;
     }
 
@@ -34,13 +34,13 @@ function Login() {
         setError('Passwords do not match.');
         return;
       }
-      const result = register(username.trim(), password);
+      const result = register(email.trim(), password);
       if (!result.success) {
         setError(result.error);
         return;
       }
     } else {
-      const result = login(username.trim(), password);
+      const result = login(email.trim(), password);
       if (!result.success) {
         setError(result.error);
         return;
@@ -68,13 +68,15 @@ function Login() {
 
           <form onSubmit={handleSubmit} className="login-form">
             <label className="login-field">
-              <span className="login-field__label">Username</span>
+              <span className="login-field__label">Email</span>
               <input
-                name="uname"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
-                autoComplete="username"
+                type="email"
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                inputMode="email"
               />
             </label>
 

@@ -46,29 +46,21 @@
   color: #1a1400 !important;
 }
 
-.app-header__profile-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 14px;
-  padding: 4px 12px 4px 4px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--cream);
-  font-size: 0.85rem;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s ease;
-}
-
-.app-header__profile-chip:hover {
-  border-color: var(--gold);
-}
-
-.app-header__profile-dot {
-  width: 22px;
-  height: 22px;
+/* Small square swatch for the active profile — click to switch profiles.
+   Icon-only (no name) since the "Welcome, {name}" text right next to it
+   already says the name; repeating it on the swatch would be redundant. */
+.app-header__profile-avatar {
+  width: 30px;
+  height: 30px;
+  margin-right: 12px;
   border-radius: 6px;
-  flex-shrink: 0;
+  border: 1px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.app-header__profile-avatar:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
 }

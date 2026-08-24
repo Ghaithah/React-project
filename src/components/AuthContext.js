@@ -10,6 +10,11 @@ const SESSION_KEY = 'movieapp_session';
 // trivially weak accounts like a one-character password.
 const MIN_PASSWORD_LENGTH = 6;
 
+// Deliberately simple (not RFC 5322-complete) — just enough to catch
+// "forgot the @" / "forgot the domain" typos without rejecting real
+// addresses with unusual-but-valid local parts.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function getStoredUsers() {
   try {
     return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
@@ -18,13 +23,11 @@ function getStoredUsers() {
   }
 }
 
-// Trims the username and collapses any run of internal whitespace down to a
-// single space. Without this, "john doe" and "john  doe" (two spaces) are
-// treated as two different, easily-confused accounts even though they're
-// visually almost identical — this makes both the uniqueness check and the
-// stored username consistent regardless of how much whitespace was typed.
-function normalizeUsername(raw) {
-  return (raw || '').trim().replace(/\s+/g, ' ');
+// Trims and lowercases the email so "Jane@Example.com" and
+// "jane@example.com" are treated as the same account, both for the
+// uniqueness check at registration and for matching a login attempt.
+function normalizeEmail(raw) {
+  return (raw || '').trim().toLowerCase();
 }
 
 export function AuthProvider({ children }) {
@@ -38,11 +41,11 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
-  function register(username, password) {
-    const normalizedUsername = normalizeUsername(username);
+  function register(email, password) {
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!normalizedUsername) {
-      return { success: false, error: 'Please enter a username.' };
+    if (!normalizedEmail || !EMAIL_PATTERN.test(normalizedEmail)) {
+      return { success: false, error: 'Please enter a valid email address.' };
     }
     if (!password || password.length < MIN_PASSWORD_LENGTH) {
       return {
@@ -52,30 +55,26 @@ export function AuthProvider({ children }) {
     }
 
     const users = getStoredUsers();
-    const taken = users.some(
-      (u) => u.username.toLowerCase() === normalizedUsername.toLowerCase()
-    );
+    const taken = users.some((u) => u.email === normalizedEmail);
     if (taken) {
-      return { success: false, error: 'That username is already taken.' };
+      return { success: false, error: 'An account with that email already exists.' };
     }
-    const updated = [...users, { username: normalizedUsername, password }];
+    const updated = [...users, { email: normalizedEmail, password }];
     localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    setUser(normalizedUsername);
+    setUser(normalizedEmail);
     return { success: true };
   }
 
-  function login(username, password) {
-    const normalizedUsername = normalizeUsername(username);
+  function login(email, password) {
+    const normalizedEmail = normalizeEmail(email);
     const users = getStoredUsers();
     const match = users.find(
-      (u) =>
-        u.username.toLowerCase() === normalizedUsername.toLowerCase() &&
-        u.password === password
+      (u) => u.email === normalizedEmail && u.password === password
     );
     if (!match) {
-      return { success: false, error: 'Incorrect username or password.' };
+      return { success: false, error: 'Incorrect email or password.' };
     }
-    setUser(match.username);
+    setUser(match.email);
     return { success: true };
   }
 

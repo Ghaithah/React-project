@@ -35,6 +35,17 @@
   color: var(--cream);
 }
 
+/* Shown only while "Manage Profiles" editing is active, explaining what the
+   name field feeds into (the header greeting) so it isn't a mystery text
+   box. Negative margin pulls it in closer to the heading above than the
+   container's normal 28px flex gap would otherwise leave. */
+.profile-select__hint {
+  margin: -16px 0 0;
+  max-width: 480px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .profile-select__grid {
   display: flex;
   flex-wrap: wrap;

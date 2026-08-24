@@ -9,11 +9,13 @@ const PROFILES_KEY_PREFIX = 'movieapp_profiles_';
 const ACTIVE_PROFILE_KEY_PREFIX = 'movieapp_active_profile_';
 
 // Six profiles, matching the "Who's watching?" grid: five regular profiles
-// (the first named after the account) plus one Kids profile that's flagged
-// so MovieSearch can restrict what it shows.
-function defaultProfilesForUser(username) {
+// plus one Kids profile that's flagged so MovieSearch can restrict what it
+// shows. Login is by account email now, which isn't a friendly display
+// name, so every profile starts out as a generic placeholder — each person
+// sets their own username for their profile from "Manage Profiles".
+function defaultProfilesForUser() {
   return [
-    { id: 'p1', name: username || 'Profile 1', color: '#3B82F6', isKids: false },
+    { id: 'p1', name: 'Profile 1', color: '#3B82F6', isKids: false },
     { id: 'p2', name: 'Profile 2', color: '#E4489A', isKids: false },
     { id: 'p3', name: 'Profile 3', color: '#2ECC71', isKids: false },
     { id: 'p4', name: 'Profile 4', color: '#9B59B6', isKids: false },
@@ -47,7 +49,7 @@ export function ProfileProvider({ children }) {
       stored = null;
     }
     if (!Array.isArray(stored) || stored.length === 0) {
-      stored = defaultProfilesForUser(user);
+      stored = defaultProfilesForUser();
       localStorage.setItem(profilesKey, JSON.stringify(stored));
     }
     setProfiles(stored);
@@ -68,6 +70,9 @@ export function ProfileProvider({ children }) {
     if (activeKey) sessionStorage.removeItem(activeKey);
   }, [activeKey]);
 
+  // Lets a profile set its own username/display name — this is what shows
+  // on the "Who's watching?" tile, the header's "Welcome, X" greeting, and
+  // the avatar tooltip once that profile is active.
   const renameProfile = useCallback(
     (id, name) => {
       setProfiles((prev) => {
