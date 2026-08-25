@@ -335,6 +335,12 @@ export default function MovieSearch() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("movie");
   const [selectedMovie, setSelectedMovie] = useState(null);
+  // The movie currently previewed in the hero banner. Set whenever a movie
+  // card is clicked anywhere (browse grid, search grid, "You Might Also
+  // Like", cast/crew rows) — clicking a card no longer jumps straight into
+  // the trailer, it just previews that title up top. Play / More Info on
+  // the hero banner is what actually opens the trailer via openMovie().
+  const [heroMovie, setHeroMovie] = useState(null);
   const [trailerId, setTrailerId] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerError, setTrailerError] = useState("");
@@ -381,6 +387,7 @@ export default function MovieSearch() {
     setMovies([]);
     setSearched(false);
     setError("");
+    setHeroMovie(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kidsMode]);
 
@@ -454,6 +461,11 @@ export default function MovieSearch() {
 
   useEffect(() => {
     const q = debouncedQuery.trim();
+    // A fresh query (or clearing back to browse) invalidates whatever was
+    // previously previewed in the hero banner — leaving it in place would
+    // either pin an old browse title above new search results, or show a
+    // stale search result after the visitor cleared the search box.
+    setHeroMovie(null);
     if (!q) {
       setMovies([]);
       setSearched(false);
@@ -504,7 +516,11 @@ export default function MovieSearch() {
 
     Promise.all(
       needsDetail.map((m) =>
-        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${m.imdbID}`)
+        // plot=full: search results start out with no Plot field at all.
+        // Without fetching it here, previewing a search result in the hero
+        // banner (see previewMovie/heroMovie below) would show a banner
+        // with no synopsis until Play was clicked.
+        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${m.imdbID}&plot=full`)
           .then((res) => res.json())
           .catch(() => null)
       )
@@ -519,6 +535,9 @@ export default function MovieSearch() {
             Genre: detail.Genre || "",
             Director: detail.Director || "",
             Actors: detail.Actors || "",
+            Plot: detail.Plot || "",
+            Runtime: detail.Runtime || "",
+            Rated: detail.Rated || "",
             imdbRating: detail.imdbRating && detail.imdbRating !== "N/A" ? parseFloat(detail.imdbRating) : null,
           };
         })
@@ -536,11 +555,14 @@ export default function MovieSearch() {
   const activeMovies = searched ? movies : browseMovies;
   const activeLoading = searched ? loading : browseLoading;
 
-  // Featured title for the hero banner: the first title in whichever
-  // curated pool is active (regular or Kids), so it swaps automatically
-  // when the profile switches. Only shown on the browse view, never over
-  // search results, and never stacked on top of the trailer/detail panel.
-  const featuredMovie = !searched && browseMovies.length > 0 ? browseMovies[0] : null;
+  // Hero banner title: whichever movie the visitor last clicked to preview
+  // (heroMovie), falling back to the first title in the curated browse
+  // pool so the banner has something to show before any click happens.
+  // The fallback only applies on the browse view — search results don't
+  // get an unrelated hero banner pinned above them unless the visitor has
+  // actually clicked one of them to preview it.
+  const defaultFeaturedMovie = !searched && browseMovies.length > 0 ? browseMovies[0] : null;
+  const featuredMovie = heroMovie || defaultFeaturedMovie;
 
   const searchHasMore = searched && !loading && movies.length > 0 && movies.length < totalResults;
   const browseHasMore =
@@ -672,6 +694,18 @@ export default function MovieSearch() {
   }, [hasMore, movies.length, browseMovies.length]);
 
 
+  // Clicking a movie card previews it in the hero banner up top, so scroll
+  // the page back to the top to bring that banner into view. Skipped when
+  // the click is actually opening the trailer (selectedMovie already set
+  // by the time this runs, since openResolvedMovie sets both selectedMovie
+  // and heroMovie together) — that flow has its own scroll-to-trailer
+  // effect right below, which should win instead.
+  useEffect(() => {
+    if (!heroMovie || selectedMovie) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroMovie]);
+
   useEffect(() => {
     if (!selectedMovie) return;
     if (trailerSectionRef.current) {
@@ -681,6 +715,17 @@ export default function MovieSearch() {
     }
   }, [selectedMovie]);
 
+
+  // Previews a movie in the hero banner rather than opening its trailer —
+  // this is what movie cards call now (browse grid, search grid, "You
+  // Might Also Like", cast/crew rows). If a trailer/detail section is
+  // already open, close it first so the hero banner is free to show.
+  // Play / More Info on the hero banner is what calls openMovie() to
+  // actually open the trailer.
+  function previewMovie(movie) {
+    setHeroMovie(movie);
+    if (selectedId) closeTrailer();
+  }
 
 
   function openMovie(movie) {
@@ -749,6 +794,11 @@ export default function MovieSearch() {
   // Does the actual trailer + detail fetching for a resolved movie object.
   function openResolvedMovie(movie) {
     setSelectedMovie(movie);
+    // Keep the hero banner in sync with whatever title is now open, so
+    // closing the trailer (X button) lands back on this title's preview
+    // instead of falling back to the default browse title — this matters
+    // for deep links (?movie=...) that never went through previewMovie.
+    setHeroMovie(movie);
     setTrailerId(null);
     setTrailerError("");
     setSelectedPerson(null); // don't carry a cast/crew filter over to the new title
@@ -1129,6 +1179,10 @@ export default function MovieSearch() {
         <HeroBanner
           movie={featuredMovie}
           truncatePlot={truncatePlot}
+          // "Featured Today" only describes the curated default pick —
+          // once a movie has been clicked to preview, the banner is
+          // showing that title, not today's pick, so the eyebrow drops.
+          isDefaultFeatured={!heroMovie}
           onPlay={() => openMovie(featuredMovie)}
           onMoreInfo={() => openMovie(featuredMovie)}
         />
@@ -1336,7 +1390,7 @@ export default function MovieSearch() {
                         {personTitles.map((m) =>
                           renderPosterCard(m, () => {
                             setSelectedPerson(null);
-                            openMovie(m);
+                            previewMovie(m);
                           })
                         )}
                       </div>
@@ -1402,7 +1456,7 @@ export default function MovieSearch() {
                   <div className="movie-search__similar">
                     <h3 className="movie-search__similar-title">You Might Also Like</h3>
                     <div className="movie-search__similar-row">
-                      {similarTitles.map((m) => renderPosterCard(m, () => openMovie(m)))}
+                      {similarTitles.map((m) => renderPosterCard(m, () => previewMovie(m)))}
                     </div>
                   </div>
                 )}
@@ -1448,15 +1502,15 @@ export default function MovieSearch() {
             <div
               key={movie.imdbID}
               className={`movie-card ${
-                selectedMovie?.imdbID === movie.imdbID ? "movie-card--selected" : ""
+                !selectedMovie && featuredMovie?.imdbID === movie.imdbID ? "movie-card--selected" : ""
               }`}
-              onClick={() => openMovie(movie)}
+              onClick={() => previewMovie(movie)}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  openMovie(movie);
+                  previewMovie(movie);
                 }
               }}
             >

@@ -81,8 +81,15 @@ function summarizeMinimal(text) {
  * the full raw plot — MovieSearch fetches this movie's Plot with OMDb's
  * `&plot=full` param so there's real, complete text to summarize from,
  * not OMDb's own pre-shortened (and often already-truncated) summary.
+ *
+ * `isDefaultFeatured` controls the "Featured Today" eyebrow above the
+ * title: it's only true for the curated default pick shown before any
+ * movie has been clicked. Once the banner is previewing a movie the
+ * visitor clicked on (browse grid, search results, "You Might Also
+ * Like"), the eyebrow is dropped — "Featured Today" would misdescribe a
+ * title the visitor picked themselves.
  */
-function HeroBanner({ movie, onPlay, onMoreInfo }) {
+function HeroBanner({ movie, onPlay, onMoreInfo, isDefaultFeatured = false }) {
   const hasPoster = !!movie.Poster && movie.Poster !== 'N/A';
 
   const genres = useMemo(
@@ -126,7 +133,7 @@ function HeroBanner({ movie, onPlay, onMoreInfo }) {
       */}
       <div className="hero-banner__row">
       <div className="hero-banner__content">
-        <p className="hero-banner__eyebrow">Featured Today</p>
+        {isDefaultFeatured && <p className="hero-banner__eyebrow">Featured Today</p>}
         <h1 className="hero-banner__title">{movie.Title}</h1>
 
         <div className="hero-banner__meta">
