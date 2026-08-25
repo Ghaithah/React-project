@@ -1,0 +1,227 @@
+.hero-banner {
+  /* No max-height here on purpose: the synopsis is shown in full now, and
+     a fixed cap combined with overflow:hidden would silently clip long
+     plots right back off after removing the line-clamp above. min-height
+     still guarantees the banner looks right even for a short plot. */
+  position: relative;
+  width: 100%;
+  min-height: 60vh;
+  overflow: hidden;
+  border-radius: 0 0 12px 12px;
+  background: #0d0f14;
+  margin-bottom: 24px;
+  color: #f4f4f4;
+}
+
+/* Scoped reset: don't assume the app's global stylesheet uses
+   box-sizing: border-box everywhere — without it, padding on
+   .hero-banner__row/.hero-banner__content would add to (rather than
+   eat into) their width and could push things wider than intended. */
+.hero-banner,
+.hero-banner * {
+  box-sizing: border-box;
+}
+
+.hero-banner__backdrop {
+  position: absolute;
+  inset: -5%;
+  background-size: cover;
+  background-position: center 20%;
+  filter: blur(28px) brightness(0.55) saturate(1.1);
+  transform: scale(1.15);
+}
+
+.hero-banner__scrim {
+  position: absolute;
+  inset: 0;
+}
+
+.hero-banner__scrim--left {
+  background: linear-gradient(
+    to right,
+    rgba(13, 15, 20, 0.96) 0%,
+    rgba(13, 15, 20, 0.65) 38%,
+    transparent 72%
+  );
+}
+
+.hero-banner__scrim--bottom {
+  background: linear-gradient(
+    to top,
+    #0d0f14 0%,
+    rgba(13, 15, 20, 0.4) 40%,
+    transparent 75%
+  );
+}
+
+/* The actual two-column layout: text on the left, poster on the right,
+   as genuine flex siblings that share the row and can never overlap —
+   unlike absolutely-positioned boxes sized independently of each other. */
+.hero-banner__row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  min-height: 60vh;
+  padding: 64px 40px 48px;
+}
+
+.hero-banner__content {
+  /* flex-basis 480px is a starting point, not a floor — min-width: 0
+     is what actually lets this shrink below its content's natural size
+     instead of forcing the row wider than the banner (the default flex
+     min-width is "auto", which is the classic cause of this kind of
+     overflow). max-width keeps it from stretching too wide on big screens. */
+  flex: 1 1 480px;
+  min-width: 0;
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-banner__eyebrow {
+  color: #e8b04b;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+
+.hero-banner__title {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.5px;
+  margin: 0 0 16px;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.hero-banner__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 14px;
+  color: #b9bcc4;
+  margin-bottom: 16px;
+}
+
+.hero-banner__rating {
+  background: rgba(232, 176, 75, 0.15);
+  color: #e8b04b;
+  border: 1px solid rgba(232, 176, 75, 0.4);
+  padding: 2px 9px;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.hero-banner__tag,
+.hero-banner__badge {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 9px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+.hero-banner__dot {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.hero-banner__synopsis {
+  /* Shown in full deliberately — no line-clamp, no truncation. max-width
+     just keeps line length readable; it doesn't cut the text off. */
+  font-size: 16px;
+  line-height: 1.55;
+  color: #e4e4e6;
+  margin: 0 0 24px;
+  max-width: 500px;
+}
+
+.hero-banner__read-more {
+  display: inline;
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #e8b04b;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.hero-banner__read-more:hover,
+.hero-banner__read-more:focus-visible {
+  text-decoration: underline;
+}
+
+.hero-banner__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.hero-banner__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.hero-banner__btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.hero-banner__btn--play {
+  background: #e8b04b;
+  color: #1a1200;
+}
+
+.hero-banner__play-icon {
+  font-size: 12px;
+}
+
+.hero-banner__btn--info {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f4f4;
+}
+
+.hero-banner__poster {
+  /* fixed-width flex item, not absolutely positioned — its width is
+     reserved space the text column's flex-basis/min-width above already
+     accounts for, so growing or shrinking the window can't make them
+     collide. */
+  flex: 0 0 auto;
+  width: clamp(160px, 22vw, 300px);
+  max-height: 480px;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  object-fit: cover;
+  display: none; /* shown from tablet width up; too cramped on phones */
+}
+
+@media (min-width: 900px) {
+  .hero-banner__poster {
+    display: block;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero-banner__title {
+    font-size: 32px;
+  }
+  .hero-banner__row {
+    padding: 48px 20px 32px;
+    min-height: 52vh;
+  }
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useProfiles } from "./ProfileContext";
+import HeroBanner from "./HeroBanner";
 import "./MovieSearch.css";
 
 
@@ -172,7 +173,7 @@ const ABBREVIATIONS = /\b(?:[A-Z]\.){2,}|\b(?:Mr|Mrs|Ms|Dr|Jr|Sr|St|vs|etc)\./g;
 // control characters, so it survives string storage/transport untouched.
 const PERIOD_PLACEHOLDER = "@@PERIOD@@";
 
-function truncatePlot(text) {
+export function truncatePlot(text) {
   if (!text) return text;
   const trimmed = text.trim();
 
@@ -204,8 +205,15 @@ function parseDetailToMovie(detail) {
     Poster: detail.Poster,
     Genre: detail.Genre || "",
     Director: detail.Director || "",
-    
+
     Actors: detail.Actors || "",
+    // Plot/Runtime/Rated aren't used by the grid cards, but the browse
+    // fetch already hits OMDb's by-ID endpoint (which returns them for
+    // free), and HeroBanner needs them — so capture them here instead of
+    // firing a second request just for the featured title.
+    Plot: detail.Plot || "",
+    Runtime: detail.Runtime || "",
+    Rated: detail.Rated || "",
     imdbRating:
       detail.imdbRating && detail.imdbRating !== "N/A"
         ? parseFloat(detail.imdbRating)
@@ -307,7 +315,7 @@ export default function MovieSearch() {
   const [totalResults, setTotalResults] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  
+
   const [browseMovies, setBrowseMovies] = useState([]);
   const [browseLoading, setBrowseLoading] = useState(true);
   const [browseLoadingMore, setBrowseLoadingMore] = useState(false);
@@ -323,7 +331,7 @@ export default function MovieSearch() {
   const [yearMax, setYearMax] = useState("");
   const [sortBy, setSortBy] = useState("relevance");
 
- 
+
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("movie");
   const [selectedMovie, setSelectedMovie] = useState(null);
@@ -336,10 +344,10 @@ export default function MovieSearch() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
 
- 
+
   const [selectedPerson, setSelectedPerson] = useState(null);
 
- 
+
   const [personInfo, setPersonInfo] = useState(null);
   const [personInfoLoading, setPersonInfoLoading] = useState(false);
 
@@ -390,7 +398,11 @@ export default function MovieSearch() {
 
     Promise.all(
       idsForPage.map((id) =>
-        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}`)
+        // plot=full: OMDb's default plot is a short, often mid-sentence
+        // clipped summary. The hero banner shows this Plot field in full
+        // now (no more line-clamp truncation on top), so it needs the
+        // real, complete synopsis rather than the pre-shortened one.
+        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}&plot=full`)
           .then((res) => res.json())
           .catch(() => null)
       )
@@ -416,7 +428,7 @@ export default function MovieSearch() {
     setBrowsePage((p) => p + 1);
   }
 
-  
+
   useEffect(() => {
     let cancelled = false;
 
@@ -439,7 +451,7 @@ export default function MovieSearch() {
     };
   }, []);
 
- 
+
   useEffect(() => {
     const q = debouncedQuery.trim();
     if (!q) {
@@ -520,10 +532,15 @@ export default function MovieSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movies.length, debouncedQuery]);
 
- 
+
   const activeMovies = searched ? movies : browseMovies;
   const activeLoading = searched ? loading : browseLoading;
 
+  // Featured title for the hero banner: the first title in whichever
+  // curated pool is active (regular or Kids), so it swaps automatically
+  // when the profile switches. Only shown on the browse view, never over
+  // search results, and never stacked on top of the trailer/detail panel.
+  const featuredMovie = !searched && browseMovies.length > 0 ? browseMovies[0] : null;
 
   const searchHasMore = searched && !loading && movies.length > 0 && movies.length < totalResults;
   const browseHasMore =
@@ -593,7 +610,7 @@ export default function MovieSearch() {
     setYearMax("");
   }
 
- 
+
   function loadMoreResults() {
     const q = debouncedQuery.trim();
     if (!q || loadingMore) return;
@@ -629,7 +646,7 @@ export default function MovieSearch() {
       });
   }
 
-  
+
   function loadMore() {
     if (searched) loadMoreResults();
     else loadMoreBrowse();
@@ -707,7 +724,7 @@ export default function MovieSearch() {
       return;
     }
 
-   
+
     let cancelled = false;
     fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${selectedId}`)
       .then((res) => res.json())
@@ -910,7 +927,7 @@ export default function MovieSearch() {
     return scored.slice(0, 10).map((s) => s.movie);
   }, [movieDetail, browseMovies, similarPool, movies, kidsMode]);
 
- 
+
   const personTitles = useMemo(() => {
     if (!selectedPerson) return [];
     const target = selectedPerson.trim().toLowerCase();
@@ -992,7 +1009,7 @@ export default function MovieSearch() {
       });
   }, [selectedPerson]);
 
- 
+
   function renderPeopleList(namesStr) {
     const names = namesStr
       .split(",")
@@ -1107,6 +1124,15 @@ export default function MovieSearch() {
           </div>
         )}
       </div>
+
+      {featuredMovie && !selectedMovie && (
+        <HeroBanner
+          movie={featuredMovie}
+          truncatePlot={truncatePlot}
+          onPlay={() => openMovie(featuredMovie)}
+          onMoreInfo={() => openMovie(featuredMovie)}
+        />
+      )}
 
       {selectedMovie && (
         <div className="movie-search__trailer" ref={trailerSectionRef}>
@@ -1439,7 +1465,7 @@ export default function MovieSearch() {
                   <img
                     src={movie.Poster}
                     alt={movie.Title}
-                   
+
                     loading={index < 4 ? "eager" : "lazy"}
                     decoding="async"
                   />
