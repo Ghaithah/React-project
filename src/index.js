@@ -6,6 +6,7 @@ import reportWebVitals from './reportWebVitals';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './components/AuthContext';
 import { ProfileProvider } from './components/ProfileContext';
+import { WatchHistoryProvider } from './components/WatchHistoryContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
@@ -14,7 +15,13 @@ root.render(
   <BrowserRouter>
     <AuthProvider>
       <ProfileProvider>
-        <App />
+        {/* Needs both useAuth() and useProfiles(), so it has to sit
+            inside both of those — this is what was missing and caused
+            the blank white screen (MovieSearch calls useWatchHistory()
+            unconditionally, which throws without this provider). */}
+        <WatchHistoryProvider>
+          <App />
+        </WatchHistoryProvider>
       </ProfileProvider>
     </AuthProvider>
   </BrowserRouter>
