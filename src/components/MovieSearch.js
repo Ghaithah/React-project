@@ -4,6 +4,7 @@ import { useProfiles } from "./ProfileContext";
 import { useWatchHistory } from "./WatchHistoryContext";
 import HeroBanner from "./HeroBanner";
 import MovieCard from "./MovieCard";
+import MovieInfoModal from "./MovieInfoModal";
 import "./MovieSearch.css";
 
 
@@ -558,6 +559,12 @@ export default function MovieSearch() {
   // the trailer, it just previews that title up top. Play / More Info on
   // the hero banner is what actually opens the trailer via openMovie().
   const [heroMovie, setHeroMovie] = useState(null);
+  // Movie currently shown in the "More Info" modal — pure metadata (full
+  // plot, cast, director, episodes for series, similar titles), no
+  // trailer. Independent of heroMovie/selectedMovie: opening it reuses
+  // fetchDetail() below (the same OMDb by-ID lookup + cache the trailer
+  // panel already relies on) but never mounts a video.
+  const [infoMovie, setInfoMovie] = useState(null);
   const [trailerId, setTrailerId] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerError, setTrailerError] = useState("");
@@ -606,6 +613,7 @@ export default function MovieSearch() {
     setSearched(false);
     setError("");
     setHeroMovie(null);
+    setInfoMovie(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kidsMode]);
 
@@ -737,6 +745,7 @@ export default function MovieSearch() {
     // either pin an old browse title above new search results, or show a
     // stale search result after the visitor cleared the search box.
     setHeroMovie(null);
+    setInfoMovie(null);
     if (!q) {
       setMovies([]);
       setSearched(false);
@@ -1053,17 +1062,39 @@ export default function MovieSearch() {
   // actually open the trailer.
   function previewMovie(movie) {
     setHeroMovie(movie);
+    setInfoMovie(null);
     if (selectedId) closeTrailer();
   }
 
 
   function openMovie(movie) {
+    // Opening the trailer supersedes whatever the "More Info" modal was
+    // showing — closing it here means Play (including the modal's own
+    // "Play Trailer" button) never leaves it lingering behind the panel
+    // that's about to open.
+    setInfoMovie(null);
     pendingMovieRef.current = movie;
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("movie", movie.imdbID);
       return next;
     });
+  }
+
+  // Opens the "More Info" modal for a title — a Netflix-style overlay with
+  // full plot, cast, director, episodes (for series), and similar titles,
+  // and no trailer. Reuses fetchDetail() (defined below) rather than
+  // duplicating the OMDb detail fetch: it's the same by-ID lookup + cache
+  // the trailer panel already relies on, just displayed without ever
+  // mounting a video.
+  function openInfo(movie) {
+    setInfoMovie(movie);
+    setSelectedPerson(null); // don't carry a cast/crew filter over from a previous title
+    fetchDetail(movie);
+  }
+
+  function closeInfo() {
+    setInfoMovie(null);
   }
 
 
@@ -1532,7 +1563,33 @@ export default function MovieSearch() {
           // showing that title, not today's pick, so the eyebrow drops.
           isDefaultFeatured={!heroMovie}
           onPlay={() => openMovie(featuredMovie)}
-          onMoreInfo={() => openMovie(featuredMovie)}
+          onMoreInfo={() => openInfo(featuredMovie)}
+        />
+      )}
+
+      {infoMovie && (
+        <MovieInfoModal
+          movie={infoMovie}
+          detail={movieDetail}
+          loading={detailLoading}
+          error={detailError}
+          onClose={closeInfo}
+          onPlayTrailer={() => openMovie(infoMovie)}
+          selectedPerson={selectedPerson}
+          onSelectPerson={(name) =>
+            setSelectedPerson((p) =>
+              p && p.toLowerCase() === name.toLowerCase() ? null : name
+            )
+          }
+          personInfo={personInfo}
+          personInfoLoading={personInfoLoading}
+          personTitles={personTitles}
+          similarTitles={similarTitles}
+          onSelectSimilar={previewMovie}
+          episodes={episodes}
+          selectedSeason={selectedSeason}
+          episodesLoading={episodesLoading}
+          onSeasonChange={handleSeasonChange}
         />
       )}
 
