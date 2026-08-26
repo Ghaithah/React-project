@@ -63,19 +63,43 @@
 
 /* Small square swatch for the active profile — click to switch profiles.
    Icon-only (no name) since the "Welcome, {name}" text right next to it
-   already says the name; repeating it on the swatch would be redundant. */
+   already says the name; repeating it on the swatch would be redundant.
+   Wraps the shared <ProfileAvatar> (same component the "Who's watching?"
+   grid uses) so the header shows the actual face icon instead of a flat
+   color swatch — it's just a plain, unstyled button shell around it. */
 .app-header__profile-avatar {
   width: 30px;
   height: 30px;
   margin-right: 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
   padding: 0;
+  background: transparent;
+  border: none;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: transform 0.15s ease;
 }
 
 .app-header__profile-avatar:hover {
-  border-color: var(--gold);
   transform: translateY(-1px);
+}
+
+/* ProfileAvatar defaults to a 12px radius sized for the 100px tiles on
+   the profile-select grid; at header size that reads better tightened
+   up, with a hairline border standing in for the grid's hover outline. */
+.app-header__profile-avatar .profile-avatar {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease;
+}
+
+.app-header__profile-avatar:hover .profile-avatar,
+.app-header__profile-avatar:focus-visible .profile-avatar {
+  border-color: var(--gold);
+  outline: none;
+  transform: none;
+}
+
+/* The "KIDS" corner badge is sized for a 100px tile — at 30px it would
+   just be a smear of red pixels, so it's hidden in the header. */
+.app-header__profile-avatar .profile-avatar__badge {
+  display: none;
 }

@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { useProfiles } from './ProfileContext'
-import { getAvatar } from './Avatars'
+import { ProfileAvatar } from './Avatars'
 import Logo from './Logo'
 import './Header.css'
 
@@ -53,8 +53,9 @@ function Header(props) {
                       onClick={() => navigate('/profiles')}
                       title="Switch profile"
                       aria-label="Switch profile"
-                      style={{ background: getAvatar(activeProfile.avatarId).color }}
-                    />
+                    >
+                      <ProfileAvatar profile={activeProfile} size={30} />
+                    </button>
                   </li>
                   {/* The greeting is keyed off the active PROFILE's name
                       (e.g. "Courtney"), not the account's login email —
