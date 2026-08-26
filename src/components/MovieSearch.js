@@ -148,6 +148,76 @@ const SIMILAR_POOL_IDS = [
   "tt1049413", // Up
 ];
 
+// Caps how many OMDb requests fire at once. Fetching a whole ID batch with
+// a bare Promise.all() (as this used to) throws every request at OMDb
+// simultaneously — up to 49 at once between the browse grid and the
+// similar-titles pool on a single page load. OMDb's free tier doesn't
+// handle that gracefully: a chunk of the burst comes back with
+// Response:"False" (rate-limited / request-limit-reached), and since
+// those were silently filtered out of the results, titles would just
+// vanish from the grid with zero indication anything went wrong. Routing
+// every OMDb fetch through this small worker pool keeps at most
+// FETCH_CONCURRENCY requests in flight at a time.
+const FETCH_CONCURRENCY = 5;
+
+async function fetchJsonPool(urls, limit = FETCH_CONCURRENCY) {
+  const results = new Array(urls.length);
+  let next = 0;
+
+  async function worker() {
+    while (next < urls.length) {
+      const i = next++;
+      try {
+        const res = await fetch(urls[i]);
+        results[i] = await res.json();
+      } catch {
+        results[i] = null;
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, urls.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
+// --- Local caching for the curated browse / similar-titles pools ---
+// The browse grid and similar-titles pool are responsible for the
+// biggest bursts of OMDb requests (see fetchJsonPool above) — up to 49
+// requests on a single page load, all for a small, mostly-static set of
+// curated IMDb IDs that rarely change. Caching successful results in
+// localStorage means a page refresh (extremely common during dev) reuses
+// what was already fetched instead of re-spending quota on the same
+// titles every time. Only a "clean" result set (zero failed lookups) is
+// ever cached, so a batch that partially failed from a rate limit /
+// exhausted daily quota isn't remembered as if it were correct — the
+// next load just retries it from the network instead.
+const CACHE_VERSION = "v1";
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // ~1 day, roughly matching OMDb's daily quota reset
+
+function readCache(key) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.savedAt !== "number") return null;
+    if (Date.now() - parsed.savedAt > CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    // localStorage unavailable (private browsing, disabled, full, etc.) —
+    // treat it as a cache miss rather than letting this break the page.
+    return null;
+  }
+}
+
+function writeCache(key, data) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), data }));
+  } catch {
+    // Storage full/unavailable — caching is a nice-to-have, not fetch-critical.
+  }
+}
+
 function useDebouncedValue(value, delay) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -320,6 +390,11 @@ export default function MovieSearch() {
   const [browseLoading, setBrowseLoading] = useState(true);
   const [browseLoadingMore, setBrowseLoadingMore] = useState(false);
   const [browsePage, setBrowsePage] = useState(0);
+  // Non-blocking notice shown when some of the curated browse titles
+  // failed to load from OMDb (rate limit, exhausted daily quota, network
+  // blip, etc.) — see fetchJsonPool above for why this can happen even
+  // though the app itself has no bug in *which* titles it's asking for.
+  const [browseWarning, setBrowseWarning] = useState("");
 
 
   const [similarPool, setSimilarPool] = useState([]);
@@ -383,6 +458,7 @@ export default function MovieSearch() {
     setBrowseMovies([]);
     setBrowsePage(0);
     setBrowseLoading(true);
+    setBrowseWarning("");
     setQuery("");
     setMovies([]);
     setSearched(false);
@@ -400,24 +476,63 @@ export default function MovieSearch() {
     if (idsForPage.length === 0) return; // ran out of curated titles
 
     let cancelled = false;
+    const cacheKey = `movieSearch:browse:${CACHE_VERSION}:${kidsMode ? "kids" : "regular"}:${browsePage}`;
+
+    const cached = readCache(cacheKey);
+    if (cached) {
+      setBrowseMovies((prev) => (browsePage === 0 ? cached : [...prev, ...cached]));
+      if (browsePage === 0) {
+        setBrowseLoading(false);
+        setBrowseWarning("");
+      } else {
+        setBrowseLoadingMore(false);
+      }
+      return;
+    }
+
     if (browsePage === 0) setBrowseLoading(true);
     else setBrowseLoadingMore(true);
 
-    Promise.all(
-      idsForPage.map((id) =>
-        // plot=full: OMDb's default plot is a short, often mid-sentence
-        // clipped summary. The hero banner shows this Plot field in full
-        // now (no more line-clamp truncation on top), so it needs the
-        // real, complete synopsis rather than the pre-shortened one.
-        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}&plot=full`)
-          .then((res) => res.json())
-          .catch(() => null)
-      )
+    // plot=full: OMDb's default plot is a short, often mid-sentence
+    // clipped summary. The hero banner shows this Plot field in full
+    // now (no more line-clamp truncation on top), so it needs the
+    // real, complete synopsis rather than the pre-shortened one.
+    //
+    // Routed through fetchJsonPool (rather than a bare Promise.all) so
+    // this batch of up to BROWSE_PAGE_SIZE requests doesn't all hit OMDb
+    // in the same instant — see fetchJsonPool's comment for why that
+    // matters.
+    fetchJsonPool(
+      idsForPage.map((id) => `https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}&plot=full`)
     ).then((results) => {
       if (cancelled) return;
       const parsed = results
         .filter((d) => d && d.Response !== "False")
         .map(parseDetailToMovie);
+      const failed = results.filter((d) => !d || d.Response === "False");
+
+      if (failed.length > 0) {
+        const reason = failed.find((d) => d && d.Error)?.Error || "a network error";
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[MovieSearch] ${failed.length}/${results.length} browse title(s) failed to load ` +
+            `from OMDb (${reason}). They were silently dropped from the grid.`
+        );
+        if (browsePage === 0) {
+          setBrowseWarning(
+            `Only ${parsed.length} of ${results.length} titles loaded (OMDb said: "${reason}").` +
+              (reason.toLowerCase().includes("limit")
+                ? " Your OMDb API key has likely hit its request limit — check your usage at omdbapi.com."
+                : " Try refreshing the page.")
+          );
+        }
+        // Not cached — a partial/failed batch shouldn't be remembered as
+        // the answer for the next 24 hours.
+      } else {
+        writeCache(cacheKey, parsed);
+        if (browsePage === 0) setBrowseWarning("");
+      }
+
       setBrowseMovies((prev) => (browsePage === 0 ? parsed : [...prev, ...parsed]));
       if (browsePage === 0) setBrowseLoading(false);
       else setBrowseLoadingMore(false);
@@ -438,18 +553,32 @@ export default function MovieSearch() {
 
   useEffect(() => {
     let cancelled = false;
+    const cacheKey = `movieSearch:similarPool:${CACHE_VERSION}`;
 
-    Promise.all(
-      SIMILAR_POOL_IDS.map((id) =>
-        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}`)
-          .then((res) => res.json())
-          .catch(() => null)
-      )
+    const cached = readCache(cacheKey);
+    if (cached) {
+      setSimilarPool(cached);
+      return;
+    }
+
+    fetchJsonPool(
+      SIMILAR_POOL_IDS.map((id) => `https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}`)
     ).then((results) => {
       if (cancelled) return;
       const parsed = results
         .filter((d) => d && d.Response !== "False")
         .map(parseDetailToMovie);
+      const failedCount = results.length - parsed.length;
+      if (failedCount > 0) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[MovieSearch] ${failedCount}/${results.length} similar-pool title(s) failed to load from OMDb.`
+        );
+        // Not cached — see the browse-pool effect above for why a
+        // partially-failed batch isn't remembered.
+      } else {
+        writeCache(cacheKey, parsed);
+      }
       setSimilarPool(parsed);
     });
 
@@ -514,16 +643,12 @@ export default function MovieSearch() {
     let cancelled = false;
     setEnriching(true);
 
-    Promise.all(
-      needsDetail.map((m) =>
-        // plot=full: search results start out with no Plot field at all.
-        // Without fetching it here, previewing a search result in the hero
-        // banner (see previewMovie/heroMovie below) would show a banner
-        // with no synopsis until Play was clicked.
-        fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${m.imdbID}&plot=full`)
-          .then((res) => res.json())
-          .catch(() => null)
-      )
+    // plot=full: search results start out with no Plot field at all.
+    // Without fetching it here, previewing a search result in the hero
+    // banner (see previewMovie/heroMovie below) would show a banner
+    // with no synopsis until Play was clicked.
+    fetchJsonPool(
+      needsDetail.map((m) => `https://www.omdbapi.com/?apikey=${API_KEY}&i=${m.imdbID}&plot=full`)
     ).then((details) => {
       if (cancelled) return;
       setMovies((prev) =>
@@ -1470,6 +1595,12 @@ export default function MovieSearch() {
         <h2 className="movie-search__section-title">
           {kidsMode ? "Kids' Picks" : "Popular Right Now"}
         </h2>
+      )}
+
+      {!searched && !activeLoading && browseWarning && (
+        <p className="movie-search__status" role="status">
+          {browseWarning}
+        </p>
       )}
 
       {activeLoading && (
