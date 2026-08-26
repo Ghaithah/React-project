@@ -744,6 +744,114 @@
   margin: 0 0 12px;
 }
 
+/* --- Top 10 Today (trending row) ---
+   A ranked, horizontally-scrolling row echoing Netflix's "Top 10" shelf:
+   a big outlined rank numeral overlapping a poster thumbnail. Reuses the
+   same horizontal-scroll + edge-fade treatment as .movie-search__similar-row
+   above, just with a wider item (rank + poster) instead of a single card. */
+
+.movie-search__trending {
+  margin: 8px 0 32px;
+}
+
+.movie-search__trending-row {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 10px 4px 10px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+}
+
+.movie-search__trending-row::-webkit-scrollbar {
+  height: 6px;
+}
+
+.movie-search__trending-row::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.movie-search__trending-item {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  padding: 0 10px 0 4px;
+}
+
+.movie-search__trending-rank {
+  flex: none;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 4.4rem;
+  line-height: 0.8;
+  font-weight: 400;
+  color: var(--gold-dim);
+  -webkit-text-stroke: 2px var(--gold-dim);
+  margin-right: -12px;
+  position: relative;
+  z-index: 0;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Browsers that support text-stroke get the Netflix-style hollow numeral;
+   everyone else keeps the solid-gold fallback set above. */
+@supports (-webkit-text-stroke: 1px black) {
+  .movie-search__trending-rank {
+    color: transparent;
+  }
+}
+
+.movie-search__trending-poster-col {
+  position: relative;
+  z-index: 1;
+  width: 104px;
+}
+
+.movie-search__trending-poster-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-search__trending-item:hover .movie-search__trending-poster-wrap,
+.movie-search__trending-item:focus-visible .movie-search__trending-poster-wrap {
+  box-shadow: 0 8px 20px rgba(232, 176, 75, 0.12);
+  border-color: var(--gold-dim);
+  transform: translateY(-2px);
+}
+
+.movie-search__trending-poster {
+  aspect-ratio: 2 / 3;
+  background: var(--surface-2);
+}
+
+.movie-search__trending-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.movie-search__trending-title {
+  margin: 8px 0 0;
+  width: 100%;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 /* --- Status text --- */
 
 .movie-search__status {
@@ -815,6 +923,82 @@
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* Hover/focus preview overlay — a scrim that rises from the bottom of the
+   poster showing a couple of genre chips and a quick Play button, so a
+   visitor with a mouse (or keyboard focus) can get a bit more context, or
+   jump straight to the trailer, without leaving the grid. Hidden by
+   default via opacity + pointer-events so it never intercepts clicks on
+   the poster underneath, and gated to real pointer devices (below) so it
+   never gets stuck "on" after a tap on touchscreens. */
+.movie-card__hover-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(13, 15, 20, 0) 42%, rgba(13, 15, 20, 0.92) 100%);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.movie-card:focus-within .movie-card__hover-overlay {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .movie-card:hover .movie-card__hover-overlay {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+}
+
+.movie-card__hover-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.movie-card__hover-genre-tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--cream);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.movie-card__hover-play {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
+  color: #1a1400;
+  font-weight: 700;
+  font-size: 0.78rem;
+  font-family: inherit;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.movie-card__hover-play:hover,
+.movie-card__hover-play:focus-visible {
+  filter: brightness(1.06);
 }
 
 .movie-card__info {
@@ -945,7 +1129,10 @@
   .movie-card,
   .movie-search__filter-toggle,
   .movie-search__load-more-btn,
-  .movie-search__similar-card {
+  .movie-search__similar-card,
+  .movie-card__hover-overlay,
+  .movie-card__hover-play,
+  .movie-search__trending-poster-wrap {
     transition: none;
   }
 

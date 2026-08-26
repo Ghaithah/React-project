@@ -69,6 +69,98 @@ const BROWSE_IDS = [
   "tt5027774", // Three Billboards Outside Ebbing, Missouri
   "tt3315342", // Logan
   "tt0169547", // American Beauty
+
+  // --- Expansion batch: pulled in from SIMILAR_POOL_IDS below (already
+  // fetched/validated for the "You Might Also Like" feature elsewhere in
+  // this file, so reusing them here for the main browse grid costs
+  // nothing new in confidence) plus a second hand-picked batch covering
+  // more classics, blockbusters, and a few well-known series. This is
+  // what actually pushes "Load more" past the old ~49-title ceiling —
+  // see the browseWarning UI below for what happens on the rare id that
+  // turns out to be wrong (OMDb quietly drops it, nothing breaks).
+  "tt0109830", // Forrest Gump
+  "tt0068646", // The Godfather
+  "tt0071562", // The Godfather Part II
+  "tt0133093", // The Matrix
+  "tt0099685", // Goodfellas
+  "tt0114369", // Se7en
+  "tt0102926", // The Silence of the Lambs
+  "tt0120737", // The Fellowship of the Ring
+  "tt0245429", // Spirited Away
+  "tt0110357", // The Lion King
+  "tt2582802", // Whiplash
+  "tt0361748", // Inglourious Basterds
+  "tt0993846", // The Wolf of Wall Street
+  "tt0119217", // Good Will Hunting
+  "tt0407887", // The Departed
+  "tt0338013", // Eternal Sunshine of the Spotless Mind
+  "tt0088763", // Back to the Future
+  "tt0209144", // Memento
+  "tt0172495", // Gladiator
+  "tt0081505", // The Shining
+  "tt0078748", // Alien
+  "tt0107048", // Groundhog Day
+  "tt0120815", // Saving Private Ryan
+  "tt0475784", // Westworld
+  "tt0076759", // Star Wars: A New Hope
+  "tt0080684", // The Empire Strikes Back
+  "tt0086190", // Return of the Jedi
+  "tt0107290", // Jurassic Park
+  "tt0114814", // The Usual Suspects
+  "tt0180093", // Requiem for a Dream
+  "tt0264464", // Catch Me If You Can
+  "tt2015381", // Guardians of the Galaxy
+  "tt0117951", // Trainspotting
+  "tt7286456", // Joker
+  "tt1130884", // Shutter Island
+  "tt2380307", // Coco
+  "tt0435761", // Toy Story 3
+  "tt1049413", // Up
+
+  "tt0108052", // Schindler's List
+  "tt0073486", // One Flew Over the Cuckoo's Nest
+  "tt0038650", // It's a Wonderful Life
+  "tt0118799", // Life Is Beautiful
+  "tt0110413", // Léon: The Professional
+  "tt0317248", // City of God
+  "tt0093058", // Full Metal Jacket
+  "tt0119488", // L.A. Confidential
+  "tt0116282", // Fargo
+  "tt0332280", // The Notebook
+  "tt0246578", // Donnie Darko
+  "tt0268978", // A Beautiful Mind
+  "tt0093779", // The Princess Bride
+  "tt0071315", // Chinatown
+  "tt0032138", // The Wizard of Oz
+  "tt0043014", // Sunset Boulevard
+  "tt0095016", // Die Hard
+  "tt0082971", // Raiders of the Lost Ark
+  "tt0033467", // Citizen Kane
+  "tt0056172", // Lawrence of Arabia
+  "tt0086879", // Amadeus
+  "tt6966692", // Green Book
+  "tt5013056", // Dunkirk
+  "tt1825683", // Black Panther
+  "tt4154756", // Avengers: Infinity War
+  "tt1160419", // Dune
+  "tt1877830", // The Batman
+  "tt10872600", // Spider-Man: No Way Home
+  "tt15398776", // Oppenheimer
+  "tt1517268", // Barbie
+  "tt0892769", // How to Train Your Dragon
+  "tt2948356", // Zootopia
+  "tt3521164", // Moana
+  "tt2294629", // Frozen
+  "tt2096673", // Inside Out
+  "tt1490017", // The Lego Movie
+  "tt1772341", // Wreck-It Ralph
+  "tt0096283", // My Neighbor Totoro
+  "tt0347149", // Howl's Moving Castle
+  "tt0141842", // The Sopranos
+  "tt0386676", // The Office (U.S.)
+  "tt0108778", // Friends
+  "tt0306414", // The Wire
+  "tt1475582", // Sherlock
 ];
 
 
@@ -101,6 +193,22 @@ const KIDS_BROWSE_IDS = [
   "tt2380307", // Coco
   "tt0129167", // The Iron Giant
   "tt0245429", // Spirited Away
+
+  // --- Expansion batch: more hand-picked family/animated titles, same
+  // ~49-title-ceiling fix as BROWSE_IDS above. Every one of these still
+  // has to clear isKidSafe() (genre-based) before it actually shows in
+  // the Kids grid — see the filteredMovies logic further down — so a
+  // title landing here isn't a bypass of that check, just more raw
+  // material for it to filter.
+  "tt1490017", // The Lego Movie
+  "tt1772341", // Wreck-It Ralph
+  "tt5848272", // Ralph Breaks the Internet
+  "tt0096283", // My Neighbor Totoro
+  "tt0347149", // Howl's Moving Castle
+  "tt0876563", // Ponyo
+  "tt2379713", // Kubo and the Two Strings
+  "tt1219827", // The Croods
+  "tt4520988", // Frozen II
 ];
 
 
@@ -350,6 +458,50 @@ function renderPosterCard(movie, onSelect) {
       </div>
       <p className="movie-search__similar-card-title">{movie.Title}</p>
       <p className="movie-search__similar-card-meta">{movie.Year}</p>
+    </div>
+  );
+}
+
+// Netflix-style hover card: a gradient scrim that rises over the poster on
+// mouse hover (or keyboard focus, via :focus-within in the CSS) showing a
+// couple of genre chips plus a quick "Play" button that jumps straight to
+// the trailer — skipping the usual click-to-preview-in-hero-banner step.
+// Pure CSS drives the reveal (see .movie-card__hover-overlay), so this is
+// only ever visible to visitors whose input actually supports hover
+// (pointer: fine) or who've focused the card via keyboard; touch visitors
+// keep the existing tap-to-preview flow untouched.
+function renderCardHoverOverlay(movie, onPlay) {
+  const genres = movie.Genre
+    ? movie.Genre.split(",").map((g) => g.trim()).filter(Boolean).slice(0, 2)
+    : [];
+
+  return (
+    <div className="movie-card__hover-overlay">
+      {genres.length > 0 && (
+        <div className="movie-card__hover-genres">
+          {genres.map((g) => (
+            <span key={g} className="movie-card__hover-genre-tag">
+              {g}
+            </span>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        className="movie-card__hover-play"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPlay();
+        }}
+        onKeyDown={(e) => {
+          // Stop Enter/Space from also bubbling up to the card's own
+          // onKeyDown, which would fire previewMovie() a second time.
+          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+        }}
+        aria-label={`Play ${movie.Title} trailer`}
+      >
+        <span aria-hidden="true">▶</span> Play
+      </button>
     </div>
   );
 }
@@ -694,6 +846,25 @@ export default function MovieSearch() {
     !searched && !browseLoading && (browsePage + 1) * BROWSE_PAGE_SIZE < browseIdsSource.length;
   const hasMore = searchHasMore || browseHasMore;
   const loadingMoreAny = loadingMore || browseLoadingMore;
+
+  // --- Derived: Top 10 Today ---
+  // A lightweight "trending" row that needs no extra API calls: it's just
+  // the titles already loaded for the browse grid and the similar-titles
+  // pool, deduped and ranked by IMDb rating. It's not real trending data
+  // (this app has no view-count analytics to rank by), but it gives the
+  // browse page a Netflix-style ranked row using data that's already on
+  // hand. Recomputes automatically as more of the browse pool streams in.
+  const topTrending = useMemo(() => {
+    const candidates = new Map();
+    [...browseMovies, ...similarPool].forEach((m) => {
+      if (!m || !m.imdbID || candidates.has(m.imdbID)) return;
+      if (kidsMode && !isKidSafe(m)) return;
+      candidates.set(m.imdbID, m);
+    });
+    return Array.from(candidates.values())
+      .sort((a, b) => (b.imdbRating ?? -1) - (a.imdbRating ?? -1))
+      .slice(0, 10);
+  }, [browseMovies, similarPool, kidsMode]);
 
   // --- Derived: genre options available so far ---
   const genreOptions = useMemo(() => {
@@ -1591,6 +1762,53 @@ export default function MovieSearch() {
         </div>
       )}
 
+      {!searched && !activeLoading && topTrending.length > 0 && (
+        <div className="movie-search__trending">
+          <h2 className="movie-search__section-title">
+            {kidsMode ? "Top 10 Kids’ Picks Today" : "Top 10 Today"}
+          </h2>
+          <div className="movie-search__trending-row">
+            {topTrending.map((movie, i) => (
+              <div
+                key={movie.imdbID}
+                className="movie-search__trending-item"
+                onClick={() => previewMovie(movie)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Preview ${movie.Title}, ranked number ${i + 1}`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    previewMovie(movie);
+                  }
+                }}
+              >
+                <span className="movie-search__trending-rank" aria-hidden="true">
+                  {i + 1}
+                </span>
+                <div className="movie-search__trending-poster-col">
+                  <div className="movie-search__trending-poster-wrap">
+                    <div className="movie-search__trending-poster">
+                      {movie.Poster !== "N/A" ? (
+                        <img
+                          src={movie.Poster}
+                          alt={movie.Title}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="movie-search__similar-poster-placeholder">No image</div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="movie-search__trending-title">{movie.Title}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!searched && !activeLoading && (
         <h2 className="movie-search__section-title">
           {kidsMode ? "Kids' Picks" : "Popular Right Now"}
@@ -1660,6 +1878,7 @@ export default function MovieSearch() {
                 {movie.imdbRating != null && (
                   <span className="movie-card__rating">{movie.imdbRating.toFixed(1)}</span>
                 )}
+                {renderCardHoverOverlay(movie, () => openMovie(movie))}
               </div>
               <div className="movie-card__info">
                 <p className="movie-card__title">{movie.Title}</p>
@@ -1674,12 +1893,16 @@ export default function MovieSearch() {
 
       {hasMore && (
         <div className="movie-search__load-more" ref={loadMoreSentinelRef}>
-          {loadingMoreAny && (
+          {loadingMoreAny ? (
             <span className="movie-search__load-more-status" role="status">
               Loading more…
             </span>
-          )}
-          {!loadingMoreAny && typeof IntersectionObserver === "undefined" && (
+          ) : (
+            // Always rendered now (not just as an IntersectionObserver
+            // fallback) — scrolling near the sentinel above still
+            // auto-loads the next batch on browsers that support it, but
+            // this gives visitors an explicit, reliable control too
+            // instead of relying purely on scroll position.
             <button type="button" className="movie-search__load-more-btn" onClick={loadMore}>
               {searched ? `Load more (${movies.length} of ${totalResults})` : "Load more"}
             </button>
