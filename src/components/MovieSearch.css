@@ -733,7 +733,7 @@
   color: var(--muted);
 }
 
-/* --- Section heading (used for the "Popular Right Now" browse grid) --- */
+/* --- Section heading (used for the browse rows + "Popular Right Now" grid) --- */
 
 .movie-search__section-title {
   font-size: 0.75rem;
@@ -742,6 +742,44 @@
   text-transform: uppercase;
   color: var(--gold-dim);
   margin: 0 0 12px;
+}
+
+/* --- Browse rows (Continue Watching + genre shelves) ---
+   The Netflix-style stack of horizontally-scrolling shelves that replaces
+   the flat "Popular Right Now" grid on the plain browse view (no search,
+   no filters/sort applied — see `showRows` in MovieSearch.js). Reuses
+   the same horizontal-scroll + edge-fade treatment as
+   .movie-search__similar-row/.movie-search__trending-row above; the
+   cards themselves are just .movie-card rendered with the "row" variant
+   (fixed width instead of a grid cell) below. */
+
+.movie-search__row-section {
+  margin: 8px 0 32px;
+}
+
+.movie-search__row-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 4px 4px 14px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+}
+
+.movie-search__row-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.movie-search__row-track::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.movie-card--row {
+  flex: none;
+  width: 170px;
 }
 
 /* --- Top 10 Today (trending row) ---
@@ -923,6 +961,97 @@
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* --- Hover-preview video ---
+   On a real mouse (see the `resolveTrailerId`/matchMedia gating in
+   MovieCard.js), lingering on a card swaps the poster underneath for a
+   muted, autoplaying trailer clip — a lightweight stand-in for Netflix's
+   hover-to-preview behavior, built from the same trailer data the main
+   player already fetches. Both the loading placeholder and the frame
+   itself sit between the poster image and the hover-overlay in DOM order,
+   so the overlay's genre chips / Play button still render on top once
+   the overlay itself fades in. */
+.movie-card__preview-loading {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-2);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.movie-card__preview-frame {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.movie-card__preview-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  /* The embed has no controls to interact with (controls=0) — leaving
+     clicks/hover to pass straight through to the card's own handlers and
+     the hover-overlay's Play button above it. */
+  pointer-events: none;
+}
+
+.movie-card__mute-toggle {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(13, 15, 20, 0.72);
+  color: var(--cream);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.movie-card__mute-toggle:hover,
+.movie-card__mute-toggle:focus-visible {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+/* --- Continue Watching remove control --- */
+
+.movie-card__remove-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(13, 15, 20, 0.75);
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.movie-card:hover .movie-card__remove-badge,
+.movie-card:focus-within .movie-card__remove-badge {
+  opacity: 1;
+}
+
+.movie-card__remove-badge:hover,
+.movie-card__remove-badge:focus-visible {
+  color: var(--gold);
+  border-color: var(--gold-dim);
 }
 
 /* Hover/focus preview overlay — a scrim that rises from the bottom of the
@@ -1132,11 +1261,14 @@
   .movie-search__similar-card,
   .movie-card__hover-overlay,
   .movie-card__hover-play,
+  .movie-card__remove-badge,
+  .movie-card__mute-toggle,
   .movie-search__trending-poster-wrap {
     transition: none;
   }
 
   .movie-card__poster--skeleton,
+  .movie-card__preview-loading,
   .skeleton-line,
   .skeleton-pill,
   .movie-search__trailer-frame--skeleton,

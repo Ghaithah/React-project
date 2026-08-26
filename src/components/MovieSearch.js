@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useProfiles } from "./ProfileContext";
+import { useWatchHistory } from "./WatchHistoryContext";
 import HeroBanner from "./HeroBanner";
+import MovieCard from "./MovieCard";
 import "./MovieSearch.css";
 
 
@@ -434,6 +436,37 @@ function isKidSafe(movie) {
 }
 
 
+// --- Genre-based browse rows ---
+// Netflix's signature browse layout isn't one big grid, it's a stack of
+// horizontally-scrolling shelves grouped by genre. This list just decides
+// which genres get first billing (and in what order) when more than one
+// qualifies; anything present in the data but not named here still gets
+// its own row, alphabetized, after these.
+const GENRE_ROW_ORDER = [
+  "Action",
+  "Comedy",
+  "Drama",
+  "Sci-Fi",
+  "Animation",
+  "Horror",
+  "Thriller",
+  "Adventure",
+  "Crime",
+  "Romance",
+  "Fantasy",
+  "Documentary",
+  "Mystery",
+  "Family",
+  "War",
+  "Biography",
+];
+// A row that can't fill out a decent-looking shelf (regular pool is
+// large; the curated Kids pool is much smaller) just isn't shown — better
+// no row than a row with three posters and a lot of empty space.
+const MIN_ROW_SIZE = 6;
+const MIN_ROW_SIZE_KIDS = 4;
+const ROW_ITEM_CAP = 15;
+
 function renderPosterCard(movie, onSelect) {
   return (
     <div
@@ -462,50 +495,6 @@ function renderPosterCard(movie, onSelect) {
   );
 }
 
-// Netflix-style hover card: a gradient scrim that rises over the poster on
-// mouse hover (or keyboard focus, via :focus-within in the CSS) showing a
-// couple of genre chips plus a quick "Play" button that jumps straight to
-// the trailer — skipping the usual click-to-preview-in-hero-banner step.
-// Pure CSS drives the reveal (see .movie-card__hover-overlay), so this is
-// only ever visible to visitors whose input actually supports hover
-// (pointer: fine) or who've focused the card via keyboard; touch visitors
-// keep the existing tap-to-preview flow untouched.
-function renderCardHoverOverlay(movie, onPlay) {
-  const genres = movie.Genre
-    ? movie.Genre.split(",").map((g) => g.trim()).filter(Boolean).slice(0, 2)
-    : [];
-
-  return (
-    <div className="movie-card__hover-overlay">
-      {genres.length > 0 && (
-        <div className="movie-card__hover-genres">
-          {genres.map((g) => (
-            <span key={g} className="movie-card__hover-genre-tag">
-              {g}
-            </span>
-          ))}
-        </div>
-      )}
-      <button
-        type="button"
-        className="movie-card__hover-play"
-        onClick={(e) => {
-          e.stopPropagation();
-          onPlay();
-        }}
-        onKeyDown={(e) => {
-          // Stop Enter/Space from also bubbling up to the card's own
-          // onKeyDown, which would fire previewMovie() a second time.
-          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
-        }}
-        aria-label={`Play ${movie.Title} trailer`}
-      >
-        <span aria-hidden="true">▶</span> Play
-      </button>
-    </div>
-  );
-}
-
 const TYPE_OPTIONS = [
   { value: "", label: "All types" },
   { value: "movie", label: "Movies" },
@@ -522,6 +511,7 @@ const SORT_OPTIONS = [
 
 export default function MovieSearch() {
   const { activeProfile } = useProfiles();
+  const { continueWatching, recordWatch, removeFromHistory } = useWatchHistory();
   const kidsMode = !!(activeProfile && activeProfile.isKids);
   const browseIdsSource = kidsMode ? KIDS_BROWSE_IDS : BROWSE_IDS;
 
@@ -866,6 +856,49 @@ export default function MovieSearch() {
       .slice(0, 10);
   }, [browseMovies, similarPool, kidsMode]);
 
+  // --- Derived: genre-based browse rows ---
+  // Groups the curated browse pool by genre into Netflix-style shelves.
+  // Only ever built from browseMovies (never search results — a search
+  // is a single flat list of matches, rows would just be noise there),
+  // and only shown once a genre has enough titles to fill a real row
+  // (see MIN_ROW_SIZE/MIN_ROW_SIZE_KIDS above).
+  const genreRows = useMemo(() => {
+    const pool = kidsMode ? browseMovies.filter(isKidSafe) : browseMovies;
+    const minSize = kidsMode ? MIN_ROW_SIZE_KIDS : MIN_ROW_SIZE;
+
+    const byGenre = new Map();
+    pool.forEach((m) => {
+      if (!m.Genre) return;
+      m.Genre.split(",")
+        .map((g) => g.trim())
+        .filter(Boolean)
+        .forEach((g) => {
+          if (!byGenre.has(g)) byGenre.set(g, []);
+          byGenre.get(g).push(m);
+        });
+    });
+
+    const orderedGenres = [
+      ...GENRE_ROW_ORDER.filter((g) => byGenre.has(g)),
+      ...Array.from(byGenre.keys())
+        .filter((g) => !GENRE_ROW_ORDER.includes(g))
+        .sort(),
+    ];
+
+    return orderedGenres
+      .map((genre) => ({ genre, movies: byGenre.get(genre).slice(0, ROW_ITEM_CAP) }))
+      .filter((row) => row.movies.length >= minSize);
+  }, [browseMovies, kidsMode]);
+
+  // Rows only replace the flat grid on the plain browse view — once a
+  // visitor has picked a type/genre/year filter or an explicit sort
+  // order, each shelf being independently curated (rather than obeying
+  // that choice) would just be confusing, so it falls back to the same
+  // filtered flat grid search results already use.
+  const filtersActive =
+    !!typeFilter || !!genreFilter || !!yearMin || !!yearMax || sortBy !== "relevance";
+  const showRows = !searched && !filtersActive && genreRows.length > 0;
+
   // --- Derived: genre options available so far ---
   const genreOptions = useMemo(() => {
     const set = new Set();
@@ -1087,6 +1120,30 @@ export default function MovieSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  // Resolves a movie's trailer video id, sharing one cache (trailerCache)
+  // across every caller: the main trailer panel below AND every
+  // MovieCard's hover preview. Resolves to `null` (not a rejection) when
+  // the search genuinely turns up nothing; a rejected promise means the
+  // request itself failed, which callers can tell apart to show a more
+  // specific error if they want to (the main trailer panel does; hover
+  // previews just treat it the same as "nothing found").
+  const resolveTrailerId = useCallback((movie) => {
+    const cached = trailerCache.current[movie.imdbID];
+    if (cached !== undefined) return Promise.resolve(cached);
+
+    const q = encodeURIComponent(`${movie.Title} ${movie.Year} official trailer`);
+    return fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=${q}&key=${YOUTUBE_API_KEY}`
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        const videoId =
+          data.items && data.items[0] && data.items[0].id ? data.items[0].id.videoId : null;
+        trailerCache.current[movie.imdbID] = videoId || null;
+        return videoId || null;
+      });
+  }, []);
+
   // Does the actual trailer + detail fetching for a resolved movie object.
   function openResolvedMovie(movie) {
     setSelectedMovie(movie);
@@ -1099,29 +1156,24 @@ export default function MovieSearch() {
     setTrailerError("");
     setSelectedPerson(null); // don't carry a cast/crew filter over to the new title
 
+    // Logs this as "watched" the moment its trailer is opened — the
+    // closest proxy this app has to real playback progress, since what's
+    // actually being opened is a trailer, not the title itself.
+    recordWatch(movie);
+
+    const requestId = ++trailerRequestId.current;
     const cached = trailerCache.current[movie.imdbID];
+
     if (cached !== undefined) {
-      trailerRequestId.current++; // invalidate any in-flight fetch from a previous click
       setTrailerId(cached);
       setTrailerLoading(false);
       if (cached === null) setTrailerError("No trailer found for this title.");
     } else {
-      const requestId = ++trailerRequestId.current;
       setTrailerLoading(true);
-
-      const q = encodeURIComponent(`${movie.Title} ${movie.Year} official trailer`);
-      fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=${q}&key=${YOUTUBE_API_KEY}`
-      )
-        .then((res) => res.json())
-        .then((data) => {
+      resolveTrailerId(movie)
+        .then((videoId) => {
           if (requestId !== trailerRequestId.current) return; // a newer click superseded this one
-          const videoId =
-            data.items && data.items[0] && data.items[0].id
-              ? data.items[0].id.videoId
-              : null;
-          trailerCache.current[movie.imdbID] = videoId || null;
-          setTrailerId(videoId || null);
+          setTrailerId(videoId);
           if (!videoId) setTrailerError("No trailer found for this title.");
         })
         .catch(() => {
@@ -1762,6 +1814,27 @@ export default function MovieSearch() {
         </div>
       )}
 
+      {!searched && !activeLoading && continueWatching.length > 0 && (
+        <div className="movie-search__row-section">
+          <h2 className="movie-search__section-title">
+            Continue Watching{activeProfile ? ` for ${activeProfile.name}` : ""}
+          </h2>
+          <div className="movie-search__row-track">
+            {continueWatching.map((movie) => (
+              <MovieCard
+                key={movie.imdbID}
+                movie={movie}
+                variant="row"
+                onSelect={() => openMovie(movie)}
+                onPlay={() => openMovie(movie)}
+                onRemove={() => removeFromHistory(movie.imdbID)}
+                resolveTrailerId={resolveTrailerId}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {!searched && !activeLoading && topTrending.length > 0 && (
         <div className="movie-search__trending">
           <h2 className="movie-search__section-title">
@@ -1809,7 +1882,27 @@ export default function MovieSearch() {
         </div>
       )}
 
-      {!searched && !activeLoading && (
+      {!searched && !activeLoading && showRows &&
+        genreRows.map((row) => (
+          <div className="movie-search__row-section" key={row.genre}>
+            <h2 className="movie-search__section-title">{row.genre}</h2>
+            <div className="movie-search__row-track">
+              {row.movies.map((movie) => (
+                <MovieCard
+                  key={movie.imdbID}
+                  movie={movie}
+                  variant="row"
+                  isFeatured={!selectedMovie && featuredMovie?.imdbID === movie.imdbID}
+                  onSelect={previewMovie}
+                  onPlay={openMovie}
+                  resolveTrailerId={resolveTrailerId}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+
+      {!searched && !activeLoading && !showRows && (
         <h2 className="movie-search__section-title">
           {kidsMode ? "Kids' Picks" : "Popular Right Now"}
         </h2>
@@ -1837,7 +1930,7 @@ export default function MovieSearch() {
 
       {!activeLoading && searched && error && <p className="movie-search__status">{error}</p>}
 
-      {!activeLoading && !error && filteredMovies.length === 0 && activeMovies.length > 0 && (
+      {!activeLoading && !error && !showRows && filteredMovies.length === 0 && activeMovies.length > 0 && (
         <p className="movie-search__status">
           {kidsMode
             ? "No kid-friendly matches found. Try a different search."
@@ -1845,48 +1938,19 @@ export default function MovieSearch() {
         </p>
       )}
 
-      {!activeLoading && !error && filteredMovies.length > 0 && (
+      {!activeLoading && !error && !showRows && filteredMovies.length > 0 && (
         <div className="movie-search__grid">
           {filteredMovies.map((movie, index) => (
-            <div
+            <MovieCard
               key={movie.imdbID}
-              className={`movie-card ${
-                !selectedMovie && featuredMovie?.imdbID === movie.imdbID ? "movie-card--selected" : ""
-              }`}
-              onClick={() => previewMovie(movie)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  previewMovie(movie);
-                }
-              }}
-            >
-              <div className="movie-card__poster">
-                {movie.Poster !== "N/A" ? (
-                  <img
-                    src={movie.Poster}
-                    alt={movie.Title}
-
-                    loading={index < 4 ? "eager" : "lazy"}
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="movie-card__poster-placeholder">No image</div>
-                )}
-                {movie.imdbRating != null && (
-                  <span className="movie-card__rating">{movie.imdbRating.toFixed(1)}</span>
-                )}
-                {renderCardHoverOverlay(movie, () => openMovie(movie))}
-              </div>
-              <div className="movie-card__info">
-                <p className="movie-card__title">{movie.Title}</p>
-                <p className="movie-card__meta">
-                  {movie.Year} · {movie.Type}
-                </p>
-              </div>
-            </div>
+              movie={movie}
+              variant="grid"
+              eagerImage={index < 4}
+              isFeatured={!selectedMovie && featuredMovie?.imdbID === movie.imdbID}
+              onSelect={previewMovie}
+              onPlay={openMovie}
+              resolveTrailerId={resolveTrailerId}
+            />
           ))}
         </div>
       )}
