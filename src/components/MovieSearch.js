@@ -405,12 +405,23 @@ function parseDetailToMovie(detail) {
 
 
 // --- Kids-profile content filtering ---
-// OMDb doesn't expose a simple "kid safe" flag, so this leans on genre as a
-// practical proxy: a title has to carry at least one clearly kid-friendly
-// genre, and none of the genres that are a near-certain sign it isn't meant
-// for children. Titles whose genre hasn't loaded yet (Genre === null, before
-// enrichment finishes) are treated as not-yet-safe rather than shown
-// optimistically, so nothing inappropriate flashes on screen while it loads.
+// OMDb doesn't expose a simple "kid safe" flag, so this leans on two
+// signals as a practical proxy: genre, and the official content rating
+// (Rated). Genre alone isn't enough — plenty of clearly adult titles
+// carry a genre tag like "Adventure" or "Comedy" alongside their harder
+// genres (Gladiator is Action/Adventure/Drama, for instance, and is
+// R-rated), so relying only on genre lets titles like that leak into the
+// Kids rows anywhere the general (non-kids-curated) pools — like
+// similarPool below, which is shared across both profile types — get
+// merged in and genre-filtered. The Rated allowlist below is the
+// stricter signal: only titles OMDb marks with a clearly kid/family
+// rating are considered safe, everything else (PG-13, R, NC-17,
+// Unrated, TV-14, TV-MA, missing/"N/A" rating, etc.) is excluded
+// regardless of genre.
+//
+// Titles whose genre or rating hasn't loaded yet (before enrichment
+// finishes) are treated as not-yet-safe rather than shown optimistically,
+// so nothing inappropriate flashes on screen while it loads.
 const KID_SAFE_GENRES = [
   "Animation",
   "Family",
@@ -428,13 +439,25 @@ const KID_UNSAFE_GENRES = [
   "Film-Noir",
   "Mystery",
 ];
+// Deliberately an allowlist, not a denylist: OMDb's Rated field is messy
+// enough (many different TV rating systems, "Not Rated", "Approved",
+// "N/A", etc.) that guessing which values are *unsafe* is easy to get
+// wrong. Only these clearly-kid/family ratings pass; everything else —
+// including PG-13, which the genre check alone was letting through —
+// does not.
+const KID_SAFE_RATINGS = ["G", "PG", "TV-Y", "TV-Y7", "TV-Y7-FV", "TV-G", "TV-PG"];
 
 function isKidSafe(movie) {
   if (!movie || !movie.Genre) return false;
   const genres = movie.Genre.split(",").map((g) => g.trim()).filter(Boolean);
   if (genres.length === 0) return false;
   if (genres.some((g) => KID_UNSAFE_GENRES.includes(g))) return false;
-  return genres.some((g) => KID_SAFE_GENRES.includes(g));
+  if (!genres.some((g) => KID_SAFE_GENRES.includes(g))) return false;
+
+  const rated = movie.Rated ? movie.Rated.trim() : "";
+  if (!KID_SAFE_RATINGS.includes(rated)) return false;
+
+  return true;
 }
 
 
@@ -867,9 +890,23 @@ export default function MovieSearch() {
   // (this app has no view-count analytics to rank by), but it gives the
   // browse page a Netflix-style ranked row using data that's already on
   // hand. Recomputes automatically as more of the browse pool streams in.
+  //
+  // similarPool is a single list fetched once for the whole app (see the
+  // effect above), built from general-audience titles (Star Wars, The
+  // Matrix, Gladiator, ...) — it was never curated with a Kids profile in
+  // mind, and genre/rating heuristics alone aren't a reliable enough gate
+  // for it: Star Wars is rated PG and carries "Adventure"/"Fantasy" genre
+  // tags, so it clears isKidSafe() even though it isn't what anyone means
+  // by a "kids pick". In Kids mode this row is built ONLY from browseMovies
+  // (which itself is sourced from the hand-picked KIDS_BROWSE_IDS pool —
+  // see browseIdsSource above), never from similarPool. Every genuinely
+  // kid-appropriate title in similarPool (Lion King, Coco, Toy Story 3,
+  // Up, Spirited Away) already has a matching entry in KIDS_BROWSE_IDS, so
+  // this loses nothing real for the Kids row while closing the leak.
   const topTrending = useMemo(() => {
+    const pool = kidsMode ? browseMovies : [...browseMovies, ...similarPool];
     const candidates = new Map();
-    [...browseMovies, ...similarPool].forEach((m) => {
+    pool.forEach((m) => {
       if (!m || !m.imdbID || candidates.has(m.imdbID)) return;
       if (kidsMode && !isKidSafe(m)) return;
       candidates.set(m.imdbID, m);
@@ -895,8 +932,13 @@ export default function MovieSearch() {
   const becauseYouWatchedRows = useMemo(() => {
     if (continueWatching.length === 0) return [];
 
+    // Same reasoning as topTrending above: similarPool is a general-audience
+    // pool that was never curated for the Kids profile, so it's excluded
+    // entirely in Kids mode rather than relied on to "genre-filter down"
+    // safely.
+    const source = kidsMode ? [...browseMovies, ...movies] : [...browseMovies, ...similarPool, ...movies];
     const pool = new Map();
-    [...browseMovies, ...similarPool, ...movies].forEach((m) => {
+    source.forEach((m) => {
       if (!m || !m.imdbID || !m.Genre || pool.has(m.imdbID)) return;
       if (kidsMode && !isKidSafe(m)) return;
       pool.set(m.imdbID, m);
@@ -1405,8 +1447,13 @@ export default function MovieSearch() {
         ? movieDetail.Director.trim()
         : null;
 
+    // Same reasoning as topTrending above: similarPool is excluded entirely
+    // in Kids mode rather than relied on to "genre-filter down" safely.
+    const similarSource = kidsMode
+      ? [...browseMovies, ...movies]
+      : [...browseMovies, ...similarPool, ...movies];
     const candidates = new Map();
-    [...browseMovies, ...similarPool, ...movies].forEach((m) => {
+    similarSource.forEach((m) => {
       if (m.imdbID && m.Genre && !candidates.has(m.imdbID)) {
         if (kidsMode && !isKidSafe(m)) return;
         candidates.set(m.imdbID, m);
@@ -1436,8 +1483,13 @@ export default function MovieSearch() {
     const target = selectedPerson.trim().toLowerCase();
     if (!target) return [];
 
+    // Same reasoning as topTrending above: similarPool is excluded entirely
+    // in Kids mode rather than relied on to "genre-filter down" safely.
+    const personSource = kidsMode
+      ? [...browseMovies, ...movies]
+      : [...browseMovies, ...similarPool, ...movies];
     const candidates = new Map();
-    [...browseMovies, ...similarPool, ...movies].forEach((m) => {
+    personSource.forEach((m) => {
       if (m.imdbID && !candidates.has(m.imdbID)) {
         if (kidsMode && !isKidSafe(m)) return;
         candidates.set(m.imdbID, m);
