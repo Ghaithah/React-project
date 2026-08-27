@@ -14,6 +14,10 @@ import './MovieInfoModal.css';
  * episodes), so this modal is just pointed at whichever movie is
  * currently open and reuses that same state + the same OMDb/Wikipedia
  * caches, rather than duplicating any network calls.
+ *
+ * `isInList` + `onToggleList` are optional, same contract as MovieCard
+ * and HeroBanner's own My List props — when passed, a second action
+ * button renders next to Play Trailer.
  */
 export default function MovieInfoModal({
   movie,
@@ -33,6 +37,8 @@ export default function MovieInfoModal({
   selectedSeason,
   episodesLoading,
   onSeasonChange,
+  isInList = false,
+  onToggleList,
 }) {
   // Standard modal hygiene: Esc closes it, and the page behind it stops
   // scrolling while it's open so a long info panel doesn't fight the
@@ -167,9 +173,22 @@ export default function MovieInfoModal({
                   ))}
                 </div>
               )}
-              <button type="button" className="movie-info-modal__play-btn" onClick={onPlayTrailer}>
-                <span aria-hidden="true">▶</span> Play Trailer
-              </button>
+              <div className="movie-info-modal__actions">
+                <button type="button" className="movie-info-modal__play-btn" onClick={onPlayTrailer}>
+                  <span aria-hidden="true">▶</span> Play Trailer
+                </button>
+                {onToggleList && (
+                  <button
+                    type="button"
+                    className={`movie-info-modal__list-btn ${isInList ? 'is-active' : ''}`}
+                    onClick={onToggleList}
+                    aria-pressed={isInList}
+                  >
+                    <span aria-hidden="true">{isInList ? '✓' : '+'}</span>{' '}
+                    {isInList ? 'In My List' : 'My List'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

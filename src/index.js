@@ -7,6 +7,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './components/AuthContext';
 import { ProfileProvider } from './components/ProfileContext';
 import { WatchHistoryProvider } from './components/WatchHistoryContext';
+import { MyListProvider } from './components/MyListContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
@@ -20,7 +21,14 @@ root.render(
             the blank white screen (MovieSearch calls useWatchHistory()
             unconditionally, which throws without this provider). */}
         <WatchHistoryProvider>
-          <App />
+          {/* Same reasoning as WatchHistoryProvider above: MovieSearch
+              calls useMyList() unconditionally, so MyListProvider has to
+              wrap it too. Nested inside WatchHistoryProvider rather than
+              beside it purely so the two per-profile-storage providers
+              read top-to-bottom as one group. */}
+          <MyListProvider>
+            <App />
+          </MyListProvider>
         </WatchHistoryProvider>
       </ProfileProvider>
     </AuthProvider>

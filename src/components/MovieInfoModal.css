@@ -158,6 +158,14 @@
   margin-bottom: 18px;
 }
 
+/* Wraps Play Trailer + the (optional) My List button so they sit side
+   by side — previously just the lone play button rendered here. */
+.movie-info-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .movie-info-modal__play-btn {
   display: inline-flex;
   align-items: center;
@@ -178,6 +186,37 @@
 .movie-info-modal__play-btn:focus-visible {
   filter: brightness(1.08);
   transform: translateY(-1px);
+}
+
+/* Secondary "+"/"✓ In My List" action — outlined by default so it doesn't
+   compete with the solid-gold Play Trailer button, filling a soft gold
+   once the title is saved (same active-state language as the hero
+   banner's own My List button and MovieCard's list toggle). */
+.movie-info-modal__list-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2ede4;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 10px 22px;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.movie-info-modal__list-btn:hover,
+.movie-info-modal__list-btn:focus-visible {
+  transform: translateY(-1px);
+}
+
+.movie-info-modal__list-btn.is-active {
+  background: rgba(232, 176, 75, 0.16);
+  color: #e8b04b;
+  border-color: #e8b04b;
 }
 
 /* --- Body: plot + facts + (reused) person/episodes/similar sections.
@@ -240,7 +279,8 @@
   }
 
   .movie-info-modal__close,
-  .movie-info-modal__play-btn {
+  .movie-info-modal__play-btn,
+  .movie-info-modal__list-btn {
     transition: none;
   }
 }

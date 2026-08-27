@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useProfiles } from "./ProfileContext";
 import { useWatchHistory } from "./WatchHistoryContext";
+import { useMyList } from "./MyListContext";
 import HeroBanner from "./HeroBanner";
 import MovieCard from "./MovieCard";
 import MovieInfoModal from "./MovieInfoModal";
@@ -468,6 +469,18 @@ const MIN_ROW_SIZE = 6;
 const MIN_ROW_SIZE_KIDS = 4;
 const ROW_ITEM_CAP = 15;
 
+// --- "Because You Watched" personalized rows ---
+// How many of the most-recently-opened Continue Watching titles get their
+// own recommendation shelf. Netflix shows a handful of these on the
+// homepage, not one per watched title — capping it keeps the page from
+// turning into an endless stack of thin, low-confidence rows.
+const BECAUSE_YOU_WATCHED_SEED_COUNT = 3;
+const BECAUSE_YOU_WATCHED_ROW_SIZE = 12;
+// Same reasoning as MIN_ROW_SIZE above: a "Because you watched X" row
+// with only two or three posters reads as broken, not personalized —
+// better to just skip that seed title and try the next one.
+const MIN_BECAUSE_YOU_WATCHED_ROW_SIZE = 5;
+
 function renderPosterCard(movie, onSelect) {
   return (
     <div
@@ -513,6 +526,7 @@ const SORT_OPTIONS = [
 export default function MovieSearch() {
   const { activeProfile } = useProfiles();
   const { continueWatching, recordWatch, removeFromHistory } = useWatchHistory();
+  const { myList, isInList, toggleInList } = useMyList();
   const kidsMode = !!(activeProfile && activeProfile.isKids);
   const browseIdsSource = kidsMode ? KIDS_BROWSE_IDS : BROWSE_IDS;
 
@@ -864,6 +878,66 @@ export default function MovieSearch() {
       .sort((a, b) => (b.imdbRating ?? -1) - (a.imdbRating ?? -1))
       .slice(0, 10);
   }, [browseMovies, similarPool, kidsMode]);
+
+  // --- Derived: "Because You Watched" personalized rows ---
+  // Builds one recommendation shelf per recently-opened Continue Watching
+  // title (most recent first), the same way Netflix's homepage does.
+  // Scoring reuses the exact approach the "More Like This"/"You Might
+  // Also Like" panel already uses for a single title (shared-genre count,
+  // highest IMDb rating as the tiebreaker) — just run once per seed
+  // instead of once for whatever's open in the trailer/info panel.
+  //
+  // Titles already in Continue Watching are excluded from every row (no
+  // point recommending something the visitor already opened), and a
+  // title picked for one row is removed from the candidate pool for the
+  // rows after it, so the same recommendation doesn't show up twice
+  // across two different "Because you watched" shelves.
+  const becauseYouWatchedRows = useMemo(() => {
+    if (continueWatching.length === 0) return [];
+
+    const pool = new Map();
+    [...browseMovies, ...similarPool, ...movies].forEach((m) => {
+      if (!m || !m.imdbID || !m.Genre || pool.has(m.imdbID)) return;
+      if (kidsMode && !isKidSafe(m)) return;
+      pool.set(m.imdbID, m);
+    });
+
+    const watchedIds = new Set(continueWatching.map((m) => m.imdbID));
+    const usedIds = new Set();
+    const minRowSize = kidsMode ? Math.min(MIN_BECAUSE_YOU_WATCHED_ROW_SIZE, MIN_ROW_SIZE_KIDS) : MIN_BECAUSE_YOU_WATCHED_ROW_SIZE;
+
+    const seeds = continueWatching
+      .filter((m) => m.Genre)
+      .slice(0, BECAUSE_YOU_WATCHED_SEED_COUNT);
+
+    const rows = [];
+    seeds.forEach((seed) => {
+      const targetGenres = new Set(
+        seed.Genre.split(",").map((g) => g.trim()).filter(Boolean)
+      );
+      if (targetGenres.size === 0) return;
+
+      const scored = [];
+      pool.forEach((m) => {
+        if (watchedIds.has(m.imdbID) || usedIds.has(m.imdbID)) return;
+        const genres = m.Genre.split(",").map((g) => g.trim()).filter(Boolean);
+        const shared = genres.filter((g) => targetGenres.has(g)).length;
+        if (shared === 0) return;
+        scored.push({ movie: m, score: shared });
+      });
+      scored.sort(
+        (a, b) => b.score - a.score || (b.movie.imdbRating ?? -1) - (a.movie.imdbRating ?? -1)
+      );
+
+      const picks = scored.slice(0, BECAUSE_YOU_WATCHED_ROW_SIZE).map((s) => s.movie);
+      if (picks.length < minRowSize) return; // too thin to read as a real recommendation shelf
+
+      picks.forEach((m) => usedIds.add(m.imdbID));
+      rows.push({ seedId: seed.imdbID, seedTitle: seed.Title, movies: picks });
+    });
+
+    return rows;
+  }, [continueWatching, browseMovies, similarPool, movies, kidsMode]);
 
   // --- Derived: genre-based browse rows ---
   // Groups the curated browse pool by genre into Netflix-style shelves.
@@ -1564,6 +1638,8 @@ export default function MovieSearch() {
           isDefaultFeatured={!heroMovie}
           onPlay={() => openMovie(featuredMovie)}
           onMoreInfo={() => openInfo(featuredMovie)}
+          isInList={isInList(featuredMovie.imdbID)}
+          onToggleList={() => toggleInList(featuredMovie)}
         />
       )}
 
@@ -1590,6 +1666,8 @@ export default function MovieSearch() {
           selectedSeason={selectedSeason}
           episodesLoading={episodesLoading}
           onSeasonChange={handleSeasonChange}
+          isInList={isInList(infoMovie.imdbID)}
+          onToggleList={() => toggleInList(infoMovie)}
         />
       )}
 
@@ -1886,11 +1964,54 @@ export default function MovieSearch() {
                 onPlay={() => openMovie(movie)}
                 onRemove={() => removeFromHistory(movie.imdbID)}
                 resolveTrailerId={resolveTrailerId}
+                isInList={isInList(movie.imdbID)}
+                onToggleList={toggleInList}
               />
             ))}
           </div>
         </div>
       )}
+
+      {!searched && !activeLoading && myList.length > 0 && (
+        <div className="movie-search__row-section">
+          <h2 className="movie-search__section-title">My List</h2>
+          <div className="movie-search__row-track">
+            {myList.map((movie) => (
+              <MovieCard
+                key={movie.imdbID}
+                movie={movie}
+                variant="row"
+                onSelect={() => previewMovie(movie)}
+                onPlay={() => openMovie(movie)}
+                resolveTrailerId={resolveTrailerId}
+                isInList={isInList(movie.imdbID)}
+                onToggleList={toggleInList}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!searched && !activeLoading &&
+        becauseYouWatchedRows.map((row) => (
+          <div className="movie-search__row-section" key={row.seedId}>
+            <h2 className="movie-search__section-title">Because You Watched {row.seedTitle}</h2>
+            <div className="movie-search__row-track">
+              {row.movies.map((movie) => (
+                <MovieCard
+                  key={movie.imdbID}
+                  movie={movie}
+                  variant="row"
+                  onSelect={previewMovie}
+                  onPlay={openMovie}
+                  resolveTrailerId={resolveTrailerId}
+                  isInList={isInList(movie.imdbID)}
+                  onToggleList={toggleInList}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
 
       {!searched && !activeLoading && topTrending.length > 0 && (
         <div className="movie-search__trending">
@@ -1953,6 +2074,8 @@ export default function MovieSearch() {
                   onSelect={previewMovie}
                   onPlay={openMovie}
                   resolveTrailerId={resolveTrailerId}
+                  isInList={isInList(movie.imdbID)}
+                  onToggleList={toggleInList}
                 />
               ))}
             </div>
@@ -2007,6 +2130,8 @@ export default function MovieSearch() {
               onSelect={previewMovie}
               onPlay={openMovie}
               resolveTrailerId={resolveTrailerId}
+              isInList={isInList(movie.imdbID)}
+              onToggleList={toggleInList}
             />
           ))}
         </div>

@@ -744,14 +744,18 @@
   margin: 0 0 12px;
 }
 
-/* --- Browse rows (Continue Watching + genre shelves) ---
+/* --- Browse rows (Continue Watching, My List, Because You Watched,
+   genre shelves) ---
    The Netflix-style stack of horizontally-scrolling shelves that replaces
    the flat "Popular Right Now" grid on the plain browse view (no search,
    no filters/sort applied — see `showRows` in MovieSearch.js). Reuses
    the same horizontal-scroll + edge-fade treatment as
    .movie-search__similar-row/.movie-search__trending-row above; the
    cards themselves are just .movie-card rendered with the "row" variant
-   (fixed width instead of a grid cell) below. */
+   (fixed width instead of a grid cell) below. My List and the
+   personalized "Because You Watched" rows are plain
+   .movie-search__row-section instances too — no dedicated CSS of their
+   own needed, same as the genre shelves. */
 
 .movie-search__row-section {
   margin: 8px 0 32px;
@@ -1108,8 +1112,17 @@
   padding: 2px 6px;
 }
 
+/* Row that holds the hover Play button + the My List toggle side by
+   side — previously Play rendered directly inside .movie-card__hover-overlay
+   on its own; this wrapper just gives it a sibling without changing its
+   own alignment/spacing. */
+.movie-card__hover-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .movie-card__hover-play {
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1128,6 +1141,41 @@
 .movie-card__hover-play:hover,
 .movie-card__hover-play:focus-visible {
   filter: brightness(1.06);
+}
+
+/* Small circular "+"/"✓" My List toggle shown next to the hover Play
+   button. Outline-only by default so it doesn't visually compete with
+   the solid-gold Play button; fills gold (matching the active/selected
+   language used elsewhere — filter toggle, person-link) once the title
+   is saved. */
+.movie-card__list-toggle {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(13, 15, 20, 0.55);
+  color: var(--cream);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.movie-card__list-toggle:hover,
+.movie-card__list-toggle:focus-visible {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+.movie-card__list-toggle.is-active {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #1a1400;
 }
 
 .movie-card__info {
@@ -1261,6 +1309,7 @@
   .movie-search__similar-card,
   .movie-card__hover-overlay,
   .movie-card__hover-play,
+  .movie-card__list-toggle,
   .movie-card__remove-badge,
   .movie-card__mute-toggle,
   .movie-search__trending-poster-wrap {

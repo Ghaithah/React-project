@@ -28,6 +28,11 @@ function supportsHoverPreview() {
  * here so every card — in every row, plus the main grid — shares MovieSearch's
  * existing trailerCache. Hovering the same title in two different rows
  * only ever costs one YouTube API call.
+ *
+ * `isInList` + `onToggleList` are optional — when a caller passes
+ * `onToggleList`, a small "+"/"✓" My List toggle renders next to the
+ * hover Play button. Callers that don't care about My List (none today,
+ * but kept optional rather than required) can simply omit both props.
  */
 export default function MovieCard({
   movie,
@@ -38,6 +43,8 @@ export default function MovieCard({
   onPlay,
   onRemove,
   resolveTrailerId,
+  isInList = false,
+  onToggleList,
 }) {
   const [previewState, setPreviewState] = useState('idle'); // idle | loading | ready | none
   const [previewId, setPreviewId] = useState(null);
@@ -178,22 +185,42 @@ export default function MovieCard({
               ))}
             </div>
           )}
-          <button
-            type="button"
-            className="movie-card__hover-play"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay(movie);
-            }}
-            onKeyDown={(e) => {
-              // Stop Enter/Space from also bubbling up to the card's own
-              // onKeyDown, which would fire handleActivate() a second time.
-              if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
-            }}
-            aria-label={`Play ${movie.Title} trailer`}
-          >
-            <span aria-hidden="true">▶</span> Play
-          </button>
+          <div className="movie-card__hover-actions">
+            <button
+              type="button"
+              className="movie-card__hover-play"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay(movie);
+              }}
+              onKeyDown={(e) => {
+                // Stop Enter/Space from also bubbling up to the card's own
+                // onKeyDown, which would fire handleActivate() a second time.
+                if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+              }}
+              aria-label={`Play ${movie.Title} trailer`}
+            >
+              <span aria-hidden="true">▶</span> Play
+            </button>
+            {onToggleList && (
+              <button
+                type="button"
+                className={`movie-card__list-toggle ${isInList ? 'is-active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleList(movie);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+                }}
+                aria-pressed={isInList}
+                aria-label={isInList ? `Remove ${movie.Title} from My List` : `Add ${movie.Title} to My List`}
+                title={isInList ? 'Remove from My List' : 'Add to My List'}
+              >
+                <span aria-hidden="true">{isInList ? '✓' : '+'}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

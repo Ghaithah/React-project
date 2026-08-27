@@ -88,8 +88,12 @@ function summarizeMinimal(text) {
  * visitor clicked on (browse grid, search results, "You Might Also
  * Like"), the eyebrow is dropped — "Featured Today" would misdescribe a
  * title the visitor picked themselves.
+ *
+ * `isInList` + `onToggleList` back a third "My List" action alongside
+ * Play / More Info — optional, same as MovieCard's list toggle, so a
+ * caller that hasn't wired up My List can simply omit them.
  */
-function HeroBanner({ movie, onPlay, onMoreInfo, isDefaultFeatured = false }) {
+function HeroBanner({ movie, onPlay, onMoreInfo, isDefaultFeatured = false, isInList = false, onToggleList }) {
   const hasPoster = !!movie.Poster && movie.Poster !== 'N/A';
 
   const genres = useMemo(
@@ -192,6 +196,17 @@ function HeroBanner({ movie, onPlay, onMoreInfo, isDefaultFeatured = false }) {
           >
             <span aria-hidden="true">ⓘ</span> More Info
           </button>
+          {onToggleList && (
+            <button
+              type="button"
+              className={`hero-banner__btn hero-banner__btn--list ${isInList ? 'is-active' : ''}`}
+              onClick={onToggleList}
+              aria-pressed={isInList}
+            >
+              <span aria-hidden="true">{isInList ? '✓' : '+'}</span>{' '}
+              {isInList ? 'In My List' : 'My List'}
+            </button>
+          )}
         </div>
       </div>
 

@@ -161,6 +161,7 @@
 
 .hero-banner__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -174,7 +175,7 @@
   font-weight: 700;
   padding: 12px 24px;
   cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease;
+  transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .hero-banner__btn:hover {
@@ -194,6 +195,23 @@
 .hero-banner__btn--info {
   background: rgba(255, 255, 255, 0.12);
   color: #f4f4f4;
+}
+
+/* Third action button, alongside Play/More Info — outlined rather than
+   filled by default (so it doesn't compete with the solid-gold Play
+   button), filling gold once the title is saved to My List. Same
+   active-state language as MovieCard's list toggle and the filter
+   toggle elsewhere on the page. */
+.hero-banner__btn--list {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f4f4;
+  border: 1.5px solid transparent;
+}
+
+.hero-banner__btn--list.is-active {
+  background: rgba(232, 176, 75, 0.16);
+  color: #e8b04b;
+  border-color: #e8b04b;
 }
 
 .hero-banner__poster {
@@ -223,5 +241,11 @@
   .hero-banner__row {
     padding: 48px 20px 32px;
     min-height: 52vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-banner__btn {
+    transition: none;
   }
 }
