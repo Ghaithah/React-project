@@ -15,12 +15,18 @@ const ACTIVE_PROFILE_KEY_PREFIX = 'movieapp_active_profile_';
 export const MAX_PROFILES = 6;
 
 // Generates an id that can't collide with an existing profile, even if
-// two profiles get created in the same millisecond.
+// two profiles get created in the same millisecond. Existing ids are
+// collected into a Set up front (rather than calling `existing.some(...)`
+// from inside the retry loop) so the loop body never declares a closure
+// over a variable it's also reassigning — that pattern is what triggers
+// eslint's no-loop-func warning, since a closure capturing a
+// loop-mutated binding can't be statically proven safe.
 function nextProfileId(existing) {
-  let id;
-  do {
+  const existingIds = new Set(existing.map((p) => p.id));
+  let id = `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  while (existingIds.has(id)) {
     id = `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  } while (existing.some((p) => p.id === id));
+  }
   return id;
 }
 

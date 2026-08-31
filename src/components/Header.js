@@ -46,6 +46,14 @@ function Header(props) {
             <>
               {activeProfile && !isProfilesPage && (
                 <>
+                  {/* Dedicated "Browse by Genre" entry point (see
+                      components/Genres.js) — a tile grid rather than
+                      only the Filters panel's Genre dropdown, so
+                      genre-browsing has its own findable spot in the
+                      nav instead of requiring a search first. */}
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/genres">Genres</Link>
+                  </li>
                   <li className="nav-item">
                     <button
                       type="button"

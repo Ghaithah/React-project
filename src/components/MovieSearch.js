@@ -23,200 +23,82 @@ if (process.env.NODE_ENV !== "production" && (!API_KEY || !YOUTUBE_API_KEY)) {
 }
 
 
-const BROWSE_IDS = [
-  "tt1375666", // Inception
-  "tt0468569", // The Dark Knight
-  "tt0816692", // Interstellar
-  "tt6751668", // Parasite
-  "tt4154796", // Avengers: Endgame
-  "tt0111161", // The Shawshank Redemption
-  "tt0110912", // Pulp Fiction
-  "tt0137523", // Fight Club
-  "tt0944947", // Game of Thrones
-  "tt4574334", // Stranger Things
-  "tt7366338", // Chernobyl
-  "tt0903747", // Breaking Bad
-  "tt0120689", // The Green Mile
-  "tt0241527", // Harry Potter and the Sorcerer's Stone
-  "tt0167260", // The Lord of the Rings: The Return of the King
-  "tt0167261", // The Lord of the Rings: The Two Towers
-  "tt0118715", // The Big Lebowski
-  "tt0482571", // The Prestige
-  "tt1345836", // The Dark Knight Rises
-  "tt0372784", // Batman Begins
-  "tt0086250", // Scarface
-  "tt0047478", // Seven Samurai
-  "tt0050083", // 12 Angry Men
-  "tt0060196", // The Good, the Bad and the Ugly
-  "tt0034583", // Casablanca
-  "tt0050212", // The Bridge on the River Kwai
-  "tt0053125", // North by Northwest
-  "tt0057012", // Dr. Strangelove
-  "tt0208092", // Snatch
-  "tt0266697", // Kill Bill: Vol. 1
-  "tt0126029", // Shrek
-  "tt0910970", // WALL·E
-  "tt0198781", // Monsters, Inc.
-  "tt0317705", // The Incredibles
-  "tt2278388", // The Grand Budapest Hotel
-  "tt0088247", // The Terminator
-  "tt0103064", // Terminator 2: Judgment Day
-  "tt0499549", // Avatar
-  "tt0796366", // Star Trek
-  "tt0369610", // Jurassic World
-  "tt0848228", // The Avengers
-  "tt4633694", // Spider-Man: Into the Spider-Verse
-  "tt0105236", // Reservoir Dogs
-  "tt0071853", // Monty Python and the Holy Grail
-  "tt0129167", // The Iron Giant
-  "tt7131622", // Once Upon a Time in Hollywood
-  "tt5027774", // Three Billboards Outside Ebbing, Missouri
-  "tt3315342", // Logan
-  "tt0169547", // American Beauty
-
-  // --- Expansion batch: pulled in from SIMILAR_POOL_IDS below (already
-  // fetched/validated for the "You Might Also Like" feature elsewhere in
-  // this file, so reusing them here for the main browse grid costs
-  // nothing new in confidence) plus a second hand-picked batch covering
-  // more classics, blockbusters, and a few well-known series. This is
-  // what actually pushes "Load more" past the old ~49-title ceiling —
-  // see the browseWarning UI below for what happens on the rare id that
-  // turns out to be wrong (OMDb quietly drops it, nothing breaks).
-  "tt0109830", // Forrest Gump
-  "tt0068646", // The Godfather
-  "tt0071562", // The Godfather Part II
-  "tt0133093", // The Matrix
-  "tt0099685", // Goodfellas
-  "tt0114369", // Se7en
-  "tt0102926", // The Silence of the Lambs
-  "tt0120737", // The Fellowship of the Ring
-  "tt0245429", // Spirited Away
-  "tt0110357", // The Lion King
-  "tt2582802", // Whiplash
-  "tt0361748", // Inglourious Basterds
-  "tt0993846", // The Wolf of Wall Street
-  "tt0119217", // Good Will Hunting
-  "tt0407887", // The Departed
-  "tt0338013", // Eternal Sunshine of the Spotless Mind
-  "tt0088763", // Back to the Future
-  "tt0209144", // Memento
-  "tt0172495", // Gladiator
-  "tt0081505", // The Shining
-  "tt0078748", // Alien
-  "tt0107048", // Groundhog Day
-  "tt0120815", // Saving Private Ryan
-  "tt0475784", // Westworld
-  "tt0076759", // Star Wars: A New Hope
-  "tt0080684", // The Empire Strikes Back
-  "tt0086190", // Return of the Jedi
-  "tt0107290", // Jurassic Park
-  "tt0114814", // The Usual Suspects
-  "tt0180093", // Requiem for a Dream
-  "tt0264464", // Catch Me If You Can
-  "tt2015381", // Guardians of the Galaxy
-  "tt0117951", // Trainspotting
-  "tt7286456", // Joker
-  "tt1130884", // Shutter Island
-  "tt2380307", // Coco
-  "tt0435761", // Toy Story 3
-  "tt1049413", // Up
-
-  "tt0108052", // Schindler's List
-  "tt0073486", // One Flew Over the Cuckoo's Nest
-  "tt0038650", // It's a Wonderful Life
-  "tt0118799", // Life Is Beautiful
-  "tt0110413", // Léon: The Professional
-  "tt0317248", // City of God
-  "tt0093058", // Full Metal Jacket
-  "tt0119488", // L.A. Confidential
-  "tt0116282", // Fargo
-  "tt0332280", // The Notebook
-  "tt0246578", // Donnie Darko
-  "tt0268978", // A Beautiful Mind
-  "tt0093779", // The Princess Bride
-  "tt0071315", // Chinatown
-  "tt0032138", // The Wizard of Oz
-  "tt0043014", // Sunset Boulevard
-  "tt0095016", // Die Hard
-  "tt0082971", // Raiders of the Lost Ark
-  "tt0033467", // Citizen Kane
-  "tt0056172", // Lawrence of Arabia
-  "tt0086879", // Amadeus
-  "tt6966692", // Green Book
-  "tt5013056", // Dunkirk
-  "tt1825683", // Black Panther
-  "tt4154756", // Avengers: Infinity War
-  "tt1160419", // Dune
-  "tt1877830", // The Batman
-  "tt10872600", // Spider-Man: No Way Home
-  "tt15398776", // Oppenheimer
-  "tt1517268", // Barbie
-  "tt0892769", // How to Train Your Dragon
-  "tt2948356", // Zootopia
-  "tt3521164", // Moana
-  "tt2294629", // Frozen
-  "tt2096673", // Inside Out
-  "tt1490017", // The Lego Movie
-  "tt1772341", // Wreck-It Ralph
-  "tt0096283", // My Neighbor Totoro
-  "tt0347149", // Howl's Moving Castle
-  "tt0141842", // The Sopranos
-  "tt0386676", // The Office (U.S.)
-  "tt0108778", // Friends
-  "tt0306414", // The Wire
-  "tt1475582", // Sherlock
+// --- "Infinite" browse: real, live OMDb search results ---
+// OMDb has no "list every movie" endpoint — its `s=` parameter only does
+// a title-contains search, and any single query tops out around 1,000
+// matches (100 pages of 10). There's genuinely no way to enumerate
+// "every movie that exists." Instead, the browse grid is powered by
+// cycling through a large pool of broad, common search terms below (each
+// one paginated through OMDb's own `s=...&page=...` results via
+// fetchNextBrowseBatch, further down), and once every term has been
+// paginated through once, cycling through the same terms again paired
+// with a rotating `y=` year filter (a real filter, not a text match) to
+// pull a different slice of results for the same term. The combined
+// term x year space is large enough — and dedupe by imdbID keeps repeats
+// out — that in any realistic scrolling session "Load more" never runs
+// dry. It's bounded by OMDb's actual catalog and your API quota (free
+// tier: 1,000 requests/day), not by a hardcoded list size.
+const BROWSE_QUERY_TERMS = [
+  "the", "man", "love", "life", "day", "night", "story", "world", "girl",
+  "boy", "king", "war", "house", "time", "dark", "star", "black", "white",
+  "blue", "red", "last", "new", "one", "two", "three", "good", "bad",
+  "great", "little", "big", "old", "young", "american", "queen", "dead",
+  "fire", "ice", "water", "gold", "silver", "city", "town", "home",
+  "family", "friend", "wedding", "christmas", "summer", "winter",
+  "spring", "school", "hotel", "prison", "island", "mountain", "river",
+  "sea", "ocean", "forest", "desert", "space", "moon", "sun", "sky",
+  "heart", "soul", "mind", "dream", "shadow", "light", "dance", "song",
+  "music", "art", "game", "play", "run", "road", "journey", "adventure",
+  "mystery", "secret", "truth", "law", "justice", "crime", "murder",
+  "kill", "death", "born", "child", "mother", "father", "brother",
+  "sister", "wife", "husband", "bride", "prince", "princess", "knight",
+  "warrior", "hero", "monster", "ghost", "witch", "wizard", "magic",
+  "power", "force", "battle", "fight", "win", "escape", "return", "rise",
+  "fall", "end", "beginning", "first", "final", "next", "north", "south",
+  "east", "west", "diamond", "silence", "sound", "voice", "letter",
+  "book", "movie", "show", "party", "birthday", "vacation", "dog", "cat",
+  "money", "business", "office", "doctor", "lawyer", "cop", "agent",
+  "spy", "soldier", "captain", "pilot", "driver", "rider", "runner",
 ];
 
-
-// A separate, hand-picked pool of family movies for the Kids profile's
-// "Popular Right Now" grid. Kept distinct from BROWSE_IDS rather than just
-// filtering it, because most of the general browse list (crime dramas, war
-// films, horror, etc.) has nothing kid-appropriate to filter down to.
-const KIDS_BROWSE_IDS = [
-  "tt0114709", // Toy Story
-  "tt0120363", // Toy Story 2
-  "tt0435761", // Toy Story 3
-  "tt1979376", // Toy Story 4
-  "tt0266543", // Finding Nemo
-  "tt0110357", // The Lion King
-  "tt0126029", // Shrek
-  "tt0910970", // WALL·E
-  "tt0198781", // Monsters, Inc.
-  "tt0317705", // The Incredibles
-  "tt1049413", // Up
-  "tt0382932", // Ratatouille
-  "tt2096673", // Inside Out
-  "tt2245084", // Big Hero 6
-  "tt1323594", // Despicable Me
-  "tt0892769", // How to Train Your Dragon
-  "tt0441773", // Kung Fu Panda
-  "tt2294629", // Frozen
-  "tt3521164", // Moana
-  "tt2948356", // Zootopia
-  "tt1109624", // Paddington
-  "tt2380307", // Coco
-  "tt0129167", // The Iron Giant
-  "tt0245429", // Spirited Away
-
-  // --- Expansion batch: more hand-picked family/animated titles, same
-  // ~49-title-ceiling fix as BROWSE_IDS above. Every one of these still
-  // has to clear isKidSafe() (genre-based) before it actually shows in
-  // the Kids grid — see the filteredMovies logic further down — so a
-  // title landing here isn't a bypass of that check, just more raw
-  // material for it to filter.
-  "tt1490017", // The Lego Movie
-  "tt1772341", // Wreck-It Ralph
-  "tt5848272", // Ralph Breaks the Internet
-  "tt0096283", // My Neighbor Totoro
-  "tt0347149", // Howl's Moving Castle
-  "tt0876563", // Ponyo
-  "tt2379713", // Kubo and the Two Strings
-  "tt1219827", // The Croods
-  "tt4520988", // Frozen II
+// A separate, family-skewed term pool for the Kids profile — every
+// result these terms turn up still has to clear isKidSafe() (genre +
+// Rated allowlist, defined below) before it actually renders in the Kids
+// grid, same as before; this just biases which raw candidates get
+// fetched in the first place so more of them pass that filter.
+const BROWSE_QUERY_TERMS_KIDS = [
+  "toy", "princess", "dragon", "dog", "cat", "robot", "superhero",
+  "magic", "school", "adventure", "animal", "forest", "ocean", "space",
+  "dinosaur", "pirate", "circus", "holiday", "birthday", "friend",
+  "family", "puppy", "kitten", "bear", "lion", "fairy", "castle",
+  "treasure", "journey", "hero", "team", "game", "sport", "race",
+  "champion", "music", "dance", "song", "movie", "farm", "zoo", "garden",
+  "snow", "rainbow", "star", "moon", "balloon", "candy", "chocolate",
+  "house", "home", "baby", "kid", "little", "big", "bunny", "duck",
+  "penguin", "monkey", "elephant", "unicorn", "mermaid",
 ];
 
+// Cycled through after the term pool above wraps around once, paired
+// with `s=` to pull a genuinely different set of results for the same
+// term (OMDb's `y=` filters by release year server-side — it isn't a
+// text match, so the same word plus a different year returns different
+// titles). `null` means "no year filter" and is always tried first.
+const BROWSE_QUERY_YEARS = [
+  null, 2025, 2022, 2019, 2016, 2013, 2010, 2007, 2004, 2001, 1998, 1995,
+  1992, 1989, 1986, 1983, 1980, 1975, 1970, 1965, 1960, 1955, 1950,
+];
 
-const BROWSE_PAGE_SIZE = 12;
+// Safety cap on how many term/year combos a single "Load more" click will
+// burn through if it keeps landing on combos with nothing new left (a
+// term already fully paginated, or a term+year pair with zero matches).
+// Without this, one click could in theory fire a long, silent chain of
+// requests; with it, a click that can't find anything new just comes up
+// a little short rather than hammering OMDb indefinitely.
+const MAX_COMBO_ADVANCE_PER_LOAD = 8;
+
+// Purely cosmetic: how many skeleton cards to show while the very first
+// browse batch is loading.
+const BROWSE_SKELETON_COUNT = 10;
 
 
 const SIMILAR_POOL_IDS = [
@@ -280,6 +162,12 @@ async function fetchJsonPool(urls, limit = FETCH_CONCURRENCY) {
     while (next < urls.length) {
       const i = next++;
       try {
+        // Every URL passed through this pool in this file is an OMDb
+        // request — count it against the daily quota budget (see
+        // trackOmdbRequest below) right alongside the other single-fetch
+        // call sites, so the counter reflects every request regardless
+        // of which code path made it.
+        trackOmdbRequest();
         const res = await fetch(urls[i]);
         results[i] = await res.json();
       } catch {
@@ -291,6 +179,52 @@ async function fetchJsonPool(urls, limit = FETCH_CONCURRENCY) {
   const workers = Array.from({ length: Math.min(limit, urls.length) }, worker);
   await Promise.all(workers);
   return results;
+}
+
+// --- Daily OMDb request counter ---
+// OMDb's free tier caps out at 1,000 requests/day and its responses
+// don't say how many are left, so the only way to know how close a
+// session is to the cap is to count client-side. Resets itself the
+// moment the stored date no longer matches today (UTC) — an
+// approximation of OMDb's actual reset time, but close enough to be
+// useful as an early-warning signal rather than an exact readout.
+const REQUEST_COUNT_KEY = "movieSearch:omdbRequestCount:v1";
+const REQUEST_COUNT_DAILY_LIMIT = 1000;
+const REQUEST_COUNT_WARN_AT = [800, 950]; // dev-console heads-up thresholds
+
+function omdbDateStamp() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD, UTC
+}
+
+function trackOmdbRequest() {
+  try {
+    const today = omdbDateStamp();
+    const raw = window.localStorage.getItem(REQUEST_COUNT_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const count = parsed && parsed.date === today ? parsed.count + 1 : 1;
+    window.localStorage.setItem(REQUEST_COUNT_KEY, JSON.stringify({ date: today, count }));
+    if (process.env.NODE_ENV !== "production" && REQUEST_COUNT_WARN_AT.includes(count)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[MovieSearch] OMDb requests today: ${count}/${REQUEST_COUNT_DAILY_LIMIT} — ` +
+          "getting close to the free-tier daily cap."
+      );
+    }
+    return count;
+  } catch {
+    // localStorage unavailable — the counter is a nice-to-have, not
+    // fetch-critical, so just skip tracking rather than breaking a fetch.
+    return null;
+  }
+}
+
+// Single-request counterpart to fetchJsonPool above: every plain
+// `fetch(...)` call to omdbapi.com elsewhere in this file goes through
+// this instead, so trackOmdbRequest() sees every OMDb request the
+// component makes, not just the ones batched through the pool.
+function fetchOmdb(url) {
+  trackOmdbRequest();
+  return fetch(url);
 }
 
 // --- Local caching for the curated browse / similar-titles pools ---
@@ -327,6 +261,98 @@ function writeCache(key, data) {
     window.localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), data }));
   } catch {
     // Storage full/unavailable — caching is a nice-to-have, not fetch-critical.
+  }
+}
+
+// --- Persistent per-title detail cache ---
+// The single biggest avoidable source of OMDb requests: the "by ID"
+// detail lookup (Genre/Director/Actors/Plot/Runtime/Rated/imdbRating)
+// that enriches every search result and browse-grid card, and that
+// fetchDetail() below uses for the trailer/"More Info" panels, was only
+// ever cached in a component-scoped ref (detailCache) — so it reset on
+// every page reload, and reloads are constant during development. Movie
+// metadata essentially never changes, so caching it in localStorage with
+// a long TTL is safe and cuts out a large share of repeat requests.
+// Keyed by imdbID inside one JSON blob (rather than one localStorage key
+// per title) to keep reads/writes cheap and predictable.
+const DETAIL_CACHE_KEY = "movieSearch:detailCache:v1";
+const DETAIL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const DETAIL_CACHE_MAX_ENTRIES = 800; // soft cap so the blob doesn't grow unbounded
+
+let detailCacheStore = null; // lazily loaded once per page load, then kept in memory
+
+function loadDetailCacheStore() {
+  if (detailCacheStore) return detailCacheStore;
+  try {
+    const raw = window.localStorage.getItem(DETAIL_CACHE_KEY);
+    detailCacheStore = raw ? JSON.parse(raw) : {};
+    if (!detailCacheStore || typeof detailCacheStore !== "object") detailCacheStore = {};
+  } catch {
+    detailCacheStore = {};
+  }
+  return detailCacheStore;
+}
+
+function persistDetailCacheStore() {
+  try {
+    window.localStorage.setItem(DETAIL_CACHE_KEY, JSON.stringify(detailCacheStore));
+  } catch {
+    // Storage full/unavailable — persistent caching is a nice-to-have.
+  }
+}
+
+function getCachedDetail(imdbID) {
+  const store = loadDetailCacheStore();
+  const entry = store[imdbID];
+  if (!entry || typeof entry.savedAt !== "number") return null;
+  if (Date.now() - entry.savedAt > DETAIL_CACHE_TTL_MS) return null;
+  return entry.data;
+}
+
+function setCachedDetail(imdbID, data) {
+  const store = loadDetailCacheStore();
+  store[imdbID] = { savedAt: Date.now(), data };
+
+  const keys = Object.keys(store);
+  if (keys.length > DETAIL_CACHE_MAX_ENTRIES) {
+    // Trim the oldest entries first rather than letting the cache (and
+    // the cost of writing it to localStorage) grow forever.
+    keys
+      .sort((a, b) => store[a].savedAt - store[b].savedAt)
+      .slice(0, keys.length - DETAIL_CACHE_MAX_ENTRIES)
+      .forEach((k) => delete store[k]);
+  }
+
+  persistDetailCacheStore();
+}
+
+// --- Recent searches (search suggestions dropdown) ---
+// A small, per-browser list of the most recent committed search terms —
+// "committed" meaning the visitor pressed Enter or picked a suggestion,
+// not every debounced keystroke. Shown in the suggestions dropdown when
+// the search box is focused and empty, the same way Netflix/most search
+// boxes offer a quick way back to something you searched a minute ago.
+const RECENT_SEARCHES_KEY = "movieSearch:recentSearches:v1";
+const MAX_RECENT_SEARCHES = 6;
+// How many live suggestions (with poster thumbnails) to show while typing.
+const MAX_SUGGESTIONS = 6;
+
+function readRecentSearches() {
+  try {
+    const raw = window.localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((t) => typeof t === "string" && t) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentSearches(list) {
+  try {
+    window.localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list));
+  } catch {
+    // Storage full/unavailable — recent searches are a nice-to-have.
   }
 }
 
@@ -400,6 +426,26 @@ function parseDetailToMovie(detail) {
       detail.imdbRating && detail.imdbRating !== "N/A"
         ? parseFloat(detail.imdbRating)
         : null,
+  };
+}
+
+// Applies a raw OMDb "by ID" detail response onto a lightweight
+// search/browse-result movie object. Shared by the movies and
+// browseMovies enrichment effects below so the field mapping only lives
+// in one place. A missing/failed detail still returns an updated object
+// (Genre: "") so the caller can tell "attempted, nothing came back" apart
+// from "not yet enriched" (Genre: null) and doesn't retry it forever.
+function mergeDetailIntoMovie(movie, detail) {
+  if (!detail) return { ...movie, Genre: "" };
+  return {
+    ...movie,
+    Genre: detail.Genre || "",
+    Director: detail.Director || "",
+    Actors: detail.Actors || "",
+    Plot: detail.Plot || "",
+    Runtime: detail.Runtime || "",
+    Rated: detail.Rated || "",
+    imdbRating: detail.imdbRating && detail.imdbRating !== "N/A" ? parseFloat(detail.imdbRating) : null,
   };
 }
 
@@ -504,6 +550,22 @@ const BECAUSE_YOU_WATCHED_ROW_SIZE = 12;
 // better to just skip that seed title and try the next one.
 const MIN_BECAUSE_YOU_WATCHED_ROW_SIZE = 5;
 
+// --- Auto-load cap (genre-filtered browsing AND text search) ---
+// Applies the same ceiling everywhere scrolling can trigger more OMDb
+// requests on its own: a genre-filtered browse view (any genre — OMDb's
+// search endpoint has no genre parameter, so genre only comes back from
+// the per-title detail lookup after a title's already been found via a
+// broad title-text search, meaning most requests spent growing a genre
+// view don't even end up matching it) and a plain text search (which,
+// for a broad query, can have thousands of OMDb matches). Letting either
+// keep auto-loading unbounded — until the term/year combo space runs
+// dry, or OMDb's own ~1,000-result search ceiling — could burn a large
+// share of the 1,000/day OMDb cap in a single scrolling session, so both
+// stop auto-loading once they've gathered this many titles. Clearing the
+// filter/search (or narrowing the query further) re-enables loading
+// more, same as before.
+const AUTO_LOAD_TARGET_COUNT = 100;
+
 function renderPosterCard(movie, onSelect) {
   return (
     <div
@@ -551,7 +613,6 @@ export default function MovieSearch() {
   const { continueWatching, recordWatch, removeFromHistory } = useWatchHistory();
   const { myList, isInList, toggleInList } = useMyList();
   const kidsMode = !!(activeProfile && activeProfile.isKids);
-  const browseIdsSource = kidsMode ? KIDS_BROWSE_IDS : BROWSE_IDS;
 
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS);
@@ -564,16 +625,41 @@ export default function MovieSearch() {
   const [page, setPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Set once a search's pagination can't advance any further — either
+  // OMDb has genuinely run out of pages for this query, or the query hit
+  // OMDb's hard cap on how many results a single `s=` search can page
+  // through (its own search endpoint stops serving pages once you're
+  // roughly 1,000 results in, well before `totalResults` for a broad
+  // query like "the" ever reaches zero remaining). Without this,
+  // `searched && movies.length < totalResults` stays true forever for
+  // any broad query, so "Load more"/infinite-scroll keeps trying (and
+  // silently failing) indefinitely once that ceiling is hit.
+  const [searchExhausted, setSearchExhausted] = useState(false);
 
 
   const [browseMovies, setBrowseMovies] = useState([]);
   const [browseLoading, setBrowseLoading] = useState(true);
   const [browseLoadingMore, setBrowseLoadingMore] = useState(false);
-  const [browsePage, setBrowsePage] = useState(0);
-  // Non-blocking notice shown when some of the curated browse titles
-  // failed to load from OMDb (rate limit, exhausted daily quota, network
-  // blip, etc.) — see fetchJsonPool above for why this can happen even
-  // though the app itself has no bug in *which* titles it's asking for.
+  const [browseExhausted, setBrowseExhausted] = useState(false);
+  // Where the "infinite" browse loader currently is in the term x year
+  // combo space (see BROWSE_QUERY_TERMS/BROWSE_QUERY_YEARS above) and
+  // which OMDb results page it's on within that combo. Refs rather than
+  // state because fetchNextBrowseBatch below advances them step-by-step
+  // inside a single async call (possibly several times per click, per
+  // MAX_COMBO_ADVANCE_PER_LOAD) — turning every step into a state update
+  // would both be unnecessary re-renders and racy across steps.
+  const browseComboIndexRef = useRef(0);
+  const browseComboPageRef = useRef(1);
+  // Every imdbID the browse loader has already surfaced, across every
+  // term/year combo queried so far this session — search terms overlap
+  // a lot ("war" and "the" both turn up plenty of the same titles), so
+  // this is what keeps "Load more" from ever showing the same movie
+  // twice.
+  const browseSeenIdsRef = useRef(new Set());
+  // Non-blocking notice shown only when fetchNextBrowseBatch hits a real
+  // OMDb quota/rate-limit error, or a network-level failure (not for an
+  // individual search term simply having no matches, which is expected
+  // and just advances to the next combo silently).
   const [browseWarning, setBrowseWarning] = useState("");
 
 
@@ -585,6 +671,13 @@ export default function MovieSearch() {
   const [yearMin, setYearMin] = useState("");
   const [yearMax, setYearMax] = useState("");
   const [sortBy, setSortBy] = useState("relevance");
+
+  // --- Search suggestions dropdown (typeahead + recent searches) ---
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [recentSearches, setRecentSearches] = useState(() => readRecentSearches());
+  const searchWrapRef = useRef(null);
+  const searchInputRef = useRef(null);
 
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -634,107 +727,180 @@ export default function MovieSearch() {
   const trailerSectionRef = useRef(null); // scroll target: the trailer panel at the top of the page
   const pendingMovieRef = useRef(null); // movie object from the click that's about to become selectedId
   const loadMoreSentinelRef = useRef(null); // bottom-of-grid marker watched for infinite scroll
+  // Guards the one-time "?genre=" URL param handoff from the Genres page
+  // (see the effect right below) so it only ever applies once per page
+  // load — after that, the Filters panel's own Genre dropdown is what
+  // drives genreFilter, and this effect must not fight it on re-renders.
+  const appliedGenreParamRef = useRef(false);
 
 
   // Switching profiles mid-session (Kids <-> regular) should reset the
-  // browse grid back to page one of whichever pool now applies, and clear
-  // any in-flight search so nothing from the other profile lingers on
-  // screen while the new pool loads.
+  // browse grid back to the start of whichever term pool now applies,
+  // and clear any in-flight search so nothing from the other profile
+  // lingers on screen while the new pool loads.
   useEffect(() => {
     setBrowseMovies([]);
-    setBrowsePage(0);
     setBrowseLoading(true);
     setBrowseWarning("");
+    setBrowseExhausted(false);
+    browseComboIndexRef.current = 0;
+    browseComboPageRef.current = 1;
+    browseSeenIdsRef.current = new Set();
     setQuery("");
     setMovies([]);
     setSearched(false);
     setError("");
+    setSearchExhausted(false);
     setHeroMovie(null);
     setInfoMovie(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kidsMode]);
 
 
+  // One-time handoff from the Genres browse page: a tile there links to
+  // `/movies?genre=<name>` so picking a genre from a dedicated grid of
+  // tiles (rather than only the Filters panel's dropdown, which you'd
+  // otherwise have to already be on this page and open Filters to find)
+  // lands here with that genre pre-applied and the Filters panel already
+  // open, showing the flat filtered grid immediately. Runs once on mount
+  // only — afterwards the Genre dropdown in the Filters panel owns
+  // genreFilter, same as if the visitor had picked it there themselves.
   useEffect(() => {
-    const idsForPage = browseIdsSource.slice(
-      browsePage * BROWSE_PAGE_SIZE,
-      (browsePage + 1) * BROWSE_PAGE_SIZE
-    );
-    if (idsForPage.length === 0) return; // ran out of curated titles
+    if (appliedGenreParamRef.current) return;
+    appliedGenreParamRef.current = true;
+    const g = searchParams.get("genre");
+    if (g) {
+      setGenreFilter(g);
+      setShowFilters(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    let cancelled = false;
-    const cacheKey = `movieSearch:browse:${CACHE_VERSION}:${kidsMode ? "kids" : "regular"}:${browsePage}`;
 
-    const cached = readCache(cacheKey);
-    if (cached) {
-      setBrowseMovies((prev) => (browsePage === 0 ? cached : [...prev, ...cached]));
-      if (browsePage === 0) {
-        setBrowseLoading(false);
-        setBrowseWarning("");
-      } else {
-        setBrowseLoadingMore(false);
+  // Walks forward through the term/year combo space (see
+  // BROWSE_QUERY_TERMS[_KIDS]/BROWSE_QUERY_YEARS above), fetching OMDb
+  // search pages one at a time, until it's gathered a decent-sized fresh
+  // batch (or hit MAX_COMBO_ADVANCE_PER_LOAD, or run out of combos
+  // entirely). A combo is "used up" once its page comes back with fewer
+  // than 10 results (OMDb's per-page cap) — at that point this moves on
+  // to the next combo rather than requesting an empty page 2. Results
+  // already seen (browseSeenIdsRef) are filtered out so the same title
+  // never shows up twice across two overlapping search terms.
+  async function fetchNextBrowseBatch() {
+    const terms = kidsMode ? BROWSE_QUERY_TERMS_KIDS : BROWSE_QUERY_TERMS;
+    const totalCombos = terms.length * BROWSE_QUERY_YEARS.length;
+    let collected = [];
+
+    for (let attempts = 0; attempts < MAX_COMBO_ADVANCE_PER_LOAD; attempts++) {
+      const combo = browseComboIndexRef.current;
+      if (combo >= totalCombos) {
+        setBrowseExhausted(true);
+        break;
       }
-      return;
+
+      const term = terms[combo % terms.length];
+      const year = BROWSE_QUERY_YEARS[Math.floor(combo / terms.length) % BROWSE_QUERY_YEARS.length];
+      const page = browseComboPageRef.current;
+      const url =
+        `https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(term)}&page=${page}` +
+        (year ? `&y=${year}` : "");
+
+      // Fetch and JSON-parse are tracked separately from "OMDb responded
+      // but found nothing" — a thrown fetch (offline, DNS hiccup, CORS,
+      // etc.) means this combo was never actually queried, so it must
+      // NOT be treated the same as "no matches for this term/page" below
+      // (which advances past the combo forever). A network failure stops
+      // the batch and leaves the combo position untouched so the next
+      // "Load more"/retry picks up exactly where it left off.
+      let data = null;
+      let networkError = false;
+      try {
+        const res = await fetchOmdb(url);
+        data = await res.json();
+      } catch {
+        networkError = true;
+      }
+
+      if (networkError) {
+        setBrowseWarning(
+          "Couldn't reach OMDb — check your connection and try \"Load more\" again."
+        );
+        break;
+      }
+
+      if (!data || data.Response === "False") {
+        const errMsg = (data && data.Error) || "";
+        if (errMsg.toLowerCase().includes("limit")) {
+          // A genuine quota/rate-limit error, not just "this combo has
+          // no matches" — surface it and stop for now rather than
+          // burning through the rest of the attempt budget on requests
+          // that'll fail the same way. Combo position is left untouched
+          // so the next click retries this exact query once the limit
+          // resets.
+          setBrowseWarning(
+            "OMDb API request limit reached for today — new titles will resume loading once your quota resets. Check your usage at omdbapi.com."
+          );
+          break;
+        }
+        // A real (non-network) OMDb response saying this term/page has
+        // no matches — move on to the next combo.
+        browseComboIndexRef.current += 1;
+        browseComboPageRef.current = 1;
+        continue;
+      }
+
+      const results = data.Search || [];
+      const fresh = results
+        .filter((m) => m.Type !== "episode" && !browseSeenIdsRef.current.has(m.imdbID))
+        .map((m) => {
+          browseSeenIdsRef.current.add(m.imdbID);
+          return { ...m, Genre: null, imdbRating: null };
+        });
+
+      if (results.length >= 10) {
+        browseComboPageRef.current += 1; // more pages likely left in this combo
+      } else {
+        browseComboIndexRef.current += 1; // this combo is exhausted
+        browseComboPageRef.current = 1;
+      }
+
+      if (fresh.length > 0) {
+        collected = collected.concat(fresh);
+        setBrowseWarning("");
+      }
+
+      if (collected.length >= 8) break; // enough for one "page" of Load More
     }
 
-    if (browsePage === 0) setBrowseLoading(true);
-    else setBrowseLoadingMore(true);
+    return collected;
+  }
 
-    // plot=full: OMDb's default plot is a short, often mid-sentence
-    // clipped summary. The hero banner shows this Plot field in full
-    // now (no more line-clamp truncation on top), so it needs the
-    // real, complete synopsis rather than the pre-shortened one.
-    //
-    // Routed through fetchJsonPool (rather than a bare Promise.all) so
-    // this batch of up to BROWSE_PAGE_SIZE requests doesn't all hit OMDb
-    // in the same instant — see fetchJsonPool's comment for why that
-    // matters.
-    fetchJsonPool(
-      idsForPage.map((id) => `https://www.omdbapi.com/?apikey=${API_KEY}&i=${id}&plot=full`)
-    ).then((results) => {
+
+  // Initial browse load: fires on mount and whenever kidsMode flips (the
+  // reset effect above clears state first — effects run in declaration
+  // order on the same commit, so this always sees the freshly-reset
+  // combo position).
+  useEffect(() => {
+    let cancelled = false;
+    fetchNextBrowseBatch().then((fresh) => {
       if (cancelled) return;
-      const parsed = results
-        .filter((d) => d && d.Response !== "False")
-        .map(parseDetailToMovie);
-      const failed = results.filter((d) => !d || d.Response === "False");
-
-      if (failed.length > 0) {
-        const reason = failed.find((d) => d && d.Error)?.Error || "a network error";
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[MovieSearch] ${failed.length}/${results.length} browse title(s) failed to load ` +
-            `from OMDb (${reason}). They were silently dropped from the grid.`
-        );
-        if (browsePage === 0) {
-          setBrowseWarning(
-            `Only ${parsed.length} of ${results.length} titles loaded (OMDb said: "${reason}").` +
-              (reason.toLowerCase().includes("limit")
-                ? " Your OMDb API key has likely hit its request limit — check your usage at omdbapi.com."
-                : " Try refreshing the page.")
-          );
-        }
-        // Not cached — a partial/failed batch shouldn't be remembered as
-        // the answer for the next 24 hours.
-      } else {
-        writeCache(cacheKey, parsed);
-        if (browsePage === 0) setBrowseWarning("");
-      }
-
-      setBrowseMovies((prev) => (browsePage === 0 ? parsed : [...prev, ...parsed]));
-      if (browsePage === 0) setBrowseLoading(false);
-      else setBrowseLoadingMore(false);
+      setBrowseMovies(fresh);
+      setBrowseLoading(false);
     });
-
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [browsePage, kidsMode]);
+  }, [kidsMode]);
 
 
   function loadMoreBrowse() {
-    if (browseLoadingMore) return;
-    setBrowsePage((p) => p + 1);
+    if (browseLoadingMore || browseExhausted) return;
+    setBrowseLoadingMore(true);
+    fetchNextBrowseBatch().then((fresh) => {
+      if (fresh.length > 0) setBrowseMovies((prev) => [...prev, ...fresh]);
+      setBrowseLoadingMore(false);
+    });
   }
 
 
@@ -789,6 +955,7 @@ export default function MovieSearch() {
       setError("");
       setPage(1);
       setTotalResults(0);
+      setSearchExhausted(false);
       return;
     }
 
@@ -797,8 +964,9 @@ export default function MovieSearch() {
     setSearched(true);
     setError("");
     setPage(1);
+    setSearchExhausted(false);
 
-    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(q)}&page=1`)
+    fetchOmdb(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(q)}&page=1`)
       .then((res) => res.json())
       .then((data) => {
         if (requestId !== searchRequestId.current) return; // stale response, ignore
@@ -831,28 +999,47 @@ export default function MovieSearch() {
     let cancelled = false;
     setEnriching(true);
 
+    // Split off anything already sitting in the persistent detail cache
+    // (see getCachedDetail above) — those get applied immediately with
+    // zero network requests, and only the genuinely-unseen titles go out
+    // to OMDb.
+    const toFetch = [];
+    const cachedById = new Map();
+    needsDetail.forEach((m) => {
+      const cached = getCachedDetail(m.imdbID);
+      if (cached) cachedById.set(m.imdbID, cached);
+      else toFetch.push(m);
+    });
+
+    if (cachedById.size > 0) {
+      setMovies((prev) =>
+        prev.map((movie) =>
+          cachedById.has(movie.imdbID)
+            ? mergeDetailIntoMovie(movie, cachedById.get(movie.imdbID))
+            : movie
+        )
+      );
+    }
+
+    if (toFetch.length === 0) {
+      setEnriching(false);
+      return;
+    }
+
     // plot=full: search results start out with no Plot field at all.
     // Without fetching it here, previewing a search result in the hero
     // banner (see previewMovie/heroMovie below) would show a banner
     // with no synopsis until Play was clicked.
     fetchJsonPool(
-      needsDetail.map((m) => `https://www.omdbapi.com/?apikey=${API_KEY}&i=${m.imdbID}&plot=full`)
+      toFetch.map((m) => `https://www.omdbapi.com/?apikey=${API_KEY}&i=${m.imdbID}&plot=full`)
     ).then((details) => {
       if (cancelled) return;
       setMovies((prev) =>
         prev.map((movie) => {
+          if (movie.Genre !== null) return movie; // already resolved above (cache hit)
           const detail = details.find((d) => d && d.imdbID === movie.imdbID);
-          if (!detail) return { ...movie, Genre: "" }; // mark as attempted, avoid retry loop
-          return {
-            ...movie,
-            Genre: detail.Genre || "",
-            Director: detail.Director || "",
-            Actors: detail.Actors || "",
-            Plot: detail.Plot || "",
-            Runtime: detail.Runtime || "",
-            Rated: detail.Rated || "",
-            imdbRating: detail.imdbRating && detail.imdbRating !== "N/A" ? parseFloat(detail.imdbRating) : null,
-          };
+          if (detail) setCachedDetail(movie.imdbID, detail);
+          return mergeDetailIntoMovie(movie, detail);
         })
       );
       setEnriching(false);
@@ -865,21 +1052,107 @@ export default function MovieSearch() {
   }, [movies.length, debouncedQuery]);
 
 
+  useEffect(() => {
+    const needsDetail = browseMovies.filter((m) => m.Genre === null);
+    if (needsDetail.length === 0) return;
+
+    let cancelled = false;
+
+    // Same cache-first split as the search-results effect above: anything
+    // already in the persistent detail cache is applied without a
+    // network request, and only genuinely-unseen titles go out to OMDb.
+    const toFetch = [];
+    const cachedById = new Map();
+    needsDetail.forEach((m) => {
+      const cached = getCachedDetail(m.imdbID);
+      if (cached) cachedById.set(m.imdbID, cached);
+      else toFetch.push(m);
+    });
+
+    if (cachedById.size > 0) {
+      setBrowseMovies((prev) =>
+        prev.map((movie) =>
+          cachedById.has(movie.imdbID)
+            ? mergeDetailIntoMovie(movie, cachedById.get(movie.imdbID))
+            : movie
+        )
+      );
+    }
+
+    if (toFetch.length === 0) return;
+
+    // Same enrichment as the search-results effect above, applied to the
+    // browse grid: fetchNextBrowseBatch (further up) only has OMDb's
+    // lightweight search-result shape (Title/Year/imdbID/Type/Poster) to
+    // work with, so genre, cast, rating, and a full plot all get filled
+    // in here via a follow-up by-ID lookup per title.
+    fetchJsonPool(
+      toFetch.map((m) => `https://www.omdbapi.com/?apikey=${API_KEY}&i=${m.imdbID}&plot=full`)
+    ).then((details) => {
+      if (cancelled) return;
+      setBrowseMovies((prev) =>
+        prev.map((movie) => {
+          if (movie.Genre !== null) return movie; // already resolved above (cache hit)
+          const detail = details.find((d) => d && d.imdbID === movie.imdbID);
+          if (detail) setCachedDetail(movie.imdbID, detail);
+          return mergeDetailIntoMovie(movie, detail);
+        })
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browseMovies.length, kidsMode]);
+
+
   const activeMovies = searched ? movies : browseMovies;
   const activeLoading = searched ? loading : browseLoading;
 
+  // --- Derived: search suggestions dropdown ---
+  // Reuses the flat `movies` list the debounced search effect above
+  // already fetches (raw OMDb search-result shape: Title/Year/imdbID/
+  // Type/Poster — enough for a poster thumbnail + title/year, no extra
+  // API calls needed) rather than firing a second, separate lookup just
+  // for the dropdown.
+  const suggestions = useMemo(
+    () => (query.trim() ? movies.slice(0, MAX_SUGGESTIONS) : []),
+    [query, movies]
+  );
+
   // Hero banner title: whichever movie the visitor last clicked to preview
-  // (heroMovie), falling back to the first title in the curated browse
-  // pool so the banner has something to show before any click happens.
-  // The fallback only applies on the browse view — search results don't
-  // get an unrelated hero banner pinned above them unless the visitor has
-  // actually clicked one of them to preview it.
+  // (heroMovie), falling back to the first title the browse loader has
+  // pulled in so the banner has something to show before any click
+  // happens. The fallback only applies on the browse view — search
+  // results don't get an unrelated hero banner pinned above them unless
+  // the visitor has actually clicked one of them to preview it.
   const defaultFeaturedMovie = !searched && browseMovies.length > 0 ? browseMovies[0] : null;
   const featuredMovie = heroMovie || defaultFeaturedMovie;
 
-  const searchHasMore = searched && !loading && movies.length > 0 && movies.length < totalResults;
-  const browseHasMore =
-    !searched && !browseLoading && (browsePage + 1) * BROWSE_PAGE_SIZE < browseIdsSource.length;
+  const searchCapped = movies.length >= AUTO_LOAD_TARGET_COUNT;
+  const searchHasMore =
+    searched &&
+    !loading &&
+    !searchExhausted &&
+    movies.length > 0 &&
+    movies.length < totalResults &&
+    !searchCapped;
+
+  // How many of the currently-loaded browse titles match the active
+  // genre filter (and kids-safety, mirroring the same slice of
+  // filteredMovies' logic below — type/year/sort aren't relevant here,
+  // only genre matters for the auto-load cap). Kept as its own small
+  // memo rather than reusing filteredMovies directly since that memo is
+  // defined further down and this needs to exist before hasMore.
+  const genreFilterMatchCount = useMemo(() => {
+    if (!genreFilter) return 0;
+    const pool = kidsMode ? browseMovies.filter(isKidSafe) : browseMovies;
+    return pool.filter((m) => m.Genre && m.Genre.includes(genreFilter)).length;
+  }, [browseMovies, kidsMode, genreFilter]);
+  const genreFilterCapped = !!genreFilter && genreFilterMatchCount >= AUTO_LOAD_TARGET_COUNT;
+
+  const browseHasMore = !searched && !browseLoading && !browseExhausted && !genreFilterCapped;
   const hasMore = searchHasMore || browseHasMore;
   const loadingMoreAny = loadingMore || browseLoadingMore;
 
@@ -898,11 +1171,12 @@ export default function MovieSearch() {
   // for it: Star Wars is rated PG and carries "Adventure"/"Fantasy" genre
   // tags, so it clears isKidSafe() even though it isn't what anyone means
   // by a "kids pick". In Kids mode this row is built ONLY from browseMovies
-  // (which itself is sourced from the hand-picked KIDS_BROWSE_IDS pool —
-  // see browseIdsSource above), never from similarPool. Every genuinely
-  // kid-appropriate title in similarPool (Lion King, Coco, Toy Story 3,
-  // Up, Spirited Away) already has a matching entry in KIDS_BROWSE_IDS, so
-  // this loses nothing real for the Kids row while closing the leak.
+  // (which itself is sourced from the Kids-specific BROWSE_QUERY_TERMS_KIDS
+  // term pool — see fetchNextBrowseBatch further up), never from
+  // similarPool. Every genuinely kid-appropriate title in similarPool
+  // (Lion King, Coco, Toy Story 3, Up, Spirited Away) is common enough
+  // that the Kids term pool turns it up too, so this loses nothing real
+  // for the Kids row while closing the leak.
   const topTrending = useMemo(() => {
     const pool = kidsMode ? browseMovies : [...browseMovies, ...similarPool];
     const candidates = new Map();
@@ -1086,20 +1360,42 @@ export default function MovieSearch() {
     setYearMax("");
   }
 
+  // Jumps straight to a flat, genre-filtered grid — used both by the
+  // "See All" link on each genre shelf below and (via the one-time
+  // ?genre= handoff effect above) by the dedicated Genres browse page.
+  // Scrolls back to the top so the now-open Filters panel is actually in
+  // view instead of leaving the visitor stranded mid-row.
+  function browseGenre(genre) {
+    setGenreFilter(genre);
+    setShowFilters(true);
+    setShowSuggestions(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
 
   function loadMoreResults() {
     const q = debouncedQuery.trim();
-    if (!q || loadingMore) return;
+    if (!q || loadingMore || searchExhausted) return;
 
     const nextPage = page + 1;
     const requestId = ++searchRequestId.current;
     setLoadingMore(true);
 
-    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(q)}&page=${nextPage}`)
+    fetchOmdb(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(q)}&page=${nextPage}`)
       .then((res) => res.json())
       .then((data) => {
         if (requestId !== searchRequestId.current) return; // a newer search superseded this one
-        if (data.Response === "False" || !data.Search) return;
+        if (data.Response === "False" || !data.Search) {
+          // OMDb has nothing left to give us for this query — either the
+          // pages have genuinely run out, or we've hit OMDb's own cap on
+          // how far a single search can paginate (it stops serving pages
+          // well before `totalResults` reaches zero remaining for broad
+          // queries). Either way, further clicks/scroll-triggers on this
+          // same query would just repeat the same failing request
+          // forever, so mark it exhausted and drop "Load more" instead.
+          setSearchExhausted(true);
+          return;
+        }
 
         setMovies((prev) => {
           const seen = new Set(prev.map((m) => m.imdbID));
@@ -1114,8 +1410,10 @@ export default function MovieSearch() {
         setTotalResults(parseInt(data.totalResults, 10) || totalResults);
       })
       .catch(() => {
-        // Leave the list as-is — the sentinel/button just stays visible so
-        // the visitor (or the observer, on next scroll) can try again.
+        // A transient network failure, not OMDb saying "no more pages" —
+        // leave searchExhausted alone so the sentinel/button stays
+        // visible and the visitor (or the observer, on next scroll) can
+        // simply try again.
       })
       .finally(() => {
         setLoadingMore(false);
@@ -1128,24 +1426,50 @@ export default function MovieSearch() {
     else loadMoreBrowse();
   }
 
+  // Keeps a ref pointed at the latest `loadMore` closure (fresh
+  // `searched`, `loadingMore`, `searchExhausted`, `page`, etc. every
+  // render) so the observer effect below can call an always-current
+  // version without needing to recreate the observer itself.
+  const loadMoreRef = useRef(loadMore);
+  useEffect(() => {
+    loadMoreRef.current = loadMore;
+  });
+
+  // Sets up ONE IntersectionObserver for as long as `hasMore` stays true,
+  // instead of tearing it down and recreating it on every
+  // movies.length/browseMovies.length change (which is what this used to
+  // depend on). That distinction is the actual fix for "Loading more…"
+  // seeming to run forever on a broad search: observing a *brand-new*
+  // IntersectionObserver instance always fires an immediate callback
+  // reporting the sentinel's current intersection state — so recreating
+  // the observer after every successful batch meant any batch that
+  // didn't push the sentinel past the 400px lookahead zone immediately
+  // triggered another automatic load, chaining into dozens of
+  // back-to-back fetches with no actual scrolling (and, for a query with
+  // hundreds of matches, burning through a lot of OMDb quota in the
+  // process). A single persistent observer instead relies on
+  // IntersectionObserver's own continuous tracking: it only calls back
+  // when the sentinel genuinely crosses in or out of the lookahead zone,
+  // whether that's from real scrolling or from the page's layout
+  // shifting — so a batch that doesn't move the sentinel out of range
+  // doesn't trigger a further fetch until the visitor actually scrolls.
   useEffect(() => {
     if (!hasMore) return;
-    if (typeof IntersectionObserver === "undefined") return; // fall back to the manual button
+    if (typeof IntersectionObserver === "undefined") return; // very old browsers just stop at the first batch
     const node = loadMoreSentinelRef.current;
     if (!node) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          loadMore();
+          loadMoreRef.current();
         }
       },
       { rootMargin: "400px" } // start fetching a bit before the sentinel is actually visible
     );
     observer.observe(node);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMore, movies.length, browseMovies.length]);
+  }, [hasMore]);
 
 
   // Clicking a movie card previews it in the hero banner up top, so scroll
@@ -1213,6 +1537,96 @@ export default function MovieSearch() {
     setInfoMovie(null);
   }
 
+  // --- Search suggestions dropdown: selection + recent-search helpers ---
+
+  function addRecentSearch(term) {
+    const clean = term.trim();
+    if (!clean) return;
+    setRecentSearches((prev) => {
+      const next = [clean, ...prev.filter((t) => t.toLowerCase() !== clean.toLowerCase())].slice(
+        0,
+        MAX_RECENT_SEARCHES
+      );
+      writeRecentSearches(next);
+      return next;
+    });
+  }
+
+  function clearRecentSearches(e) {
+    e.stopPropagation();
+    setRecentSearches([]);
+    writeRecentSearches([]);
+  }
+
+  // Picking a live suggestion (poster + title) jumps straight to that
+  // title's "More Info" modal — the same destination the row/grid cards'
+  // own More Info affordance opens — rather than just filling the search
+  // box in, since the whole point of a suggestion is "this is the one I
+  // meant."
+  function handleSelectSuggestion(movie) {
+    if (!movie) return;
+    addRecentSearch(query.trim() || movie.Title);
+    setShowSuggestions(false);
+    setHighlightedIndex(-1);
+    openInfo(movie);
+  }
+
+  // Picking a recent search re-runs it (rather than opening a title
+  // directly, since a bare search term doesn't resolve to one movie) —
+  // dropping the query back in lets the existing debounced search effect
+  // take over and the dropdown itself flips over to live suggestions as
+  // soon as results come back.
+  function handleSelectRecent(term) {
+    setQuery(term);
+    setHighlightedIndex(-1);
+  }
+
+  function handleQueryChange(e) {
+    setQuery(e.target.value);
+    setShowSuggestions(true);
+    setHighlightedIndex(-1);
+  }
+
+  function handleSearchKeyDown(e) {
+    const list = query.trim() ? suggestions : recentSearches;
+
+    if (e.key === "Escape") {
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    if (!showSuggestions || list.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.min(i + 1, list.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      if (highlightedIndex >= 0 && highlightedIndex < list.length) {
+        e.preventDefault();
+        if (query.trim()) handleSelectSuggestion(suggestions[highlightedIndex]);
+        else handleSelectRecent(recentSearches[highlightedIndex]);
+      } else if (query.trim()) {
+        addRecentSearch(query.trim());
+        setShowSuggestions(false);
+        if (searchInputRef.current) searchInputRef.current.blur();
+      }
+    }
+  }
+
+  // Closes the dropdown once focus leaves the whole search field wrapper
+  // (input + dropdown) — checking relatedTarget (rather than just always
+  // closing on blur) means clicking a suggestion itself doesn't close the
+  // dropdown out from under the click before onClick fires.
+  function handleSearchWrapBlur(e) {
+    if (searchWrapRef.current && searchWrapRef.current.contains(e.relatedTarget)) return;
+    setShowSuggestions(false);
+    setHighlightedIndex(-1);
+  }
+
 
   useEffect(() => {
     if (!selectedId) {
@@ -1247,7 +1661,7 @@ export default function MovieSearch() {
 
 
     let cancelled = false;
-    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${selectedId}`)
+    fetchOmdb(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${selectedId}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -1357,10 +1771,26 @@ export default function MovieSearch() {
       return;
     }
 
+    // Fall back to the persistent (localStorage) detail cache before
+    // hitting the network — this is what makes reopening a title's
+    // trailer/"More Info" panel free after a page reload instead of
+    // spending another request on a title already looked up recently.
+    const persisted = getCachedDetail(movie.imdbID);
+    if (persisted) {
+      detailCache.current[movie.imdbID] = persisted;
+      detailRequestId.current++; // invalidate any in-flight fetch from a previous click
+      setDetailLoading(false);
+      setMovieDetail(persisted);
+      if (persisted.Type === "series" && persisted.totalSeasons && persisted.totalSeasons !== "N/A") {
+        fetchEpisodes(movie.imdbID, 1);
+      }
+      return;
+    }
+
     const requestId = ++detailRequestId.current;
     setDetailLoading(true);
 
-    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${movie.imdbID}&plot=full`)
+    fetchOmdb(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${movie.imdbID}&plot=full`)
       .then((res) => res.json())
       .then((data) => {
         if (requestId !== detailRequestId.current) return; // a newer click superseded this one
@@ -1370,6 +1800,7 @@ export default function MovieSearch() {
           return;
         }
         detailCache.current[movie.imdbID] = data;
+        setCachedDetail(movie.imdbID, data);
         setMovieDetail(data);
         if (data.Type === "series" && data.totalSeasons && data.totalSeasons !== "N/A") {
           fetchEpisodes(movie.imdbID, 1);
@@ -1397,7 +1828,7 @@ export default function MovieSearch() {
     const requestId = ++episodesRequestId.current;
     setEpisodesLoading(true);
 
-    fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${imdbID}&Season=${season}`)
+    fetchOmdb(`https://www.omdbapi.com/?apikey=${API_KEY}&i=${imdbID}&Season=${season}`)
       .then((res) => res.json())
       .then((data) => {
         if (requestId !== episodesRequestId.current) return;
@@ -1604,15 +2035,116 @@ export default function MovieSearch() {
 
       <div className="movie-search__controls">
         <div className="movie-search__search-row">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={
-              kidsMode ? "Search for a kid-friendly movie, e.g. Shrek" : "Search for a movie, e.g. Inception"
-            }
-            className="movie-search__input"
-          />
+          <div
+            className="movie-search__search-field"
+            ref={searchWrapRef}
+            onBlur={handleSearchWrapBlur}
+          >
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={query}
+              onChange={handleQueryChange}
+              onFocus={() => setShowSuggestions(true)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder={
+                kidsMode ? "Search for a kid-friendly movie, e.g. Shrek" : "Search for a movie, e.g. Inception"
+              }
+              className="movie-search__input"
+              role="combobox"
+              aria-expanded={showSuggestions}
+              aria-haspopup="listbox"
+              aria-controls="movie-search-suggestions"
+              aria-autocomplete="list"
+              aria-activedescendant={
+                highlightedIndex >= 0 ? `movie-search-suggestion-${highlightedIndex}` : undefined
+              }
+              autoComplete="off"
+            />
+
+            {showSuggestions &&
+              (query.trim()
+                ? loading || suggestions.length > 0
+                : recentSearches.length > 0) && (
+                <div
+                  id="movie-search-suggestions"
+                  className="movie-search__suggestions"
+                  role="listbox"
+                >
+                  {query.trim() ? (
+                    suggestions.length === 0 ? (
+                      <div className="movie-search__suggestions-status">Searching…</div>
+                    ) : (
+                      suggestions.map((m, i) => (
+                        <div
+                          key={m.imdbID}
+                          id={`movie-search-suggestion-${i}`}
+                          role="option"
+                          aria-selected={highlightedIndex === i}
+                          className={`movie-search__suggestion ${
+                            highlightedIndex === i ? "is-highlighted" : ""
+                          }`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onMouseEnter={() => setHighlightedIndex(i)}
+                          onClick={() => handleSelectSuggestion(m)}
+                        >
+                          <div className="movie-search__suggestion-poster">
+                            {m.Poster && m.Poster !== "N/A" ? (
+                              <img src={m.Poster} alt="" loading="lazy" decoding="async" />
+                            ) : (
+                              <div
+                                className="movie-search__suggestion-poster-placeholder"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </div>
+                          <div className="movie-search__suggestion-info">
+                            <p className="movie-search__suggestion-title">{m.Title}</p>
+                            <p className="movie-search__suggestion-meta">
+                              {m.Year} · {m.Type}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )
+                  ) : (
+                    <>
+                      <div className="movie-search__suggestions-header">
+                        <span>Recent searches</span>
+                        <button
+                          type="button"
+                          className="movie-search__suggestions-clear"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={clearRecentSearches}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      {recentSearches.map((term, i) => (
+                        <div
+                          key={term}
+                          id={`movie-search-suggestion-${i}`}
+                          role="option"
+                          aria-selected={highlightedIndex === i}
+                          className={`movie-search__suggestion movie-search__suggestion--recent ${
+                            highlightedIndex === i ? "is-highlighted" : ""
+                          }`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onMouseEnter={() => setHighlightedIndex(i)}
+                          onClick={() => handleSelectRecent(term)}
+                        >
+                          <span className="movie-search__suggestion-recent-icon" aria-hidden="true">
+                            ⏱
+                          </span>
+                          <span className="movie-search__suggestion-title">{term}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+          </div>
+
           <button
             type="button"
             onClick={() => setShowFilters((s) => !s)}
@@ -2068,7 +2600,7 @@ export default function MovieSearch() {
       {!searched && !activeLoading && topTrending.length > 0 && (
         <div className="movie-search__trending">
           <h2 className="movie-search__section-title">
-            {kidsMode ? "Top 10 Kids’ Picks Today" : "Top 10 Today"}
+            {kidsMode ? "Top 10 Kids' Picks Today" : "Top 10 Today"}
           </h2>
           <div className="movie-search__trending-row">
             {topTrending.map((movie, i) => (
@@ -2115,7 +2647,16 @@ export default function MovieSearch() {
       {!searched && !activeLoading && showRows &&
         genreRows.map((row) => (
           <div className="movie-search__row-section" key={row.genre}>
-            <h2 className="movie-search__section-title">{row.genre}</h2>
+            <div className="movie-search__row-header">
+              <h2 className="movie-search__section-title">{row.genre}</h2>
+              <button
+                type="button"
+                className="movie-search__row-seeall"
+                onClick={() => browseGenre(row.genre)}
+              >
+                See All ›
+              </button>
+            </div>
             <div className="movie-search__row-track">
               {row.movies.map((movie) => (
                 <MovieCard
@@ -2148,7 +2689,7 @@ export default function MovieSearch() {
 
       {activeLoading && (
         <div className="movie-search__grid">
-          {Array.from({ length: searched ? 8 : BROWSE_PAGE_SIZE }).map((_, i) => (
+          {Array.from({ length: searched ? 8 : BROWSE_SKELETON_COUNT }).map((_, i) => (
             <div key={i} className="movie-card movie-card--skeleton">
               <div className="movie-card__poster movie-card__poster--skeleton" />
               <div className="movie-card__info">
@@ -2189,23 +2730,40 @@ export default function MovieSearch() {
         </div>
       )}
 
+      {!activeLoading && !searched && !showRows && genreFilterCapped && (
+        <p className="movie-search__status" role="status">
+          Showing the first {AUTO_LOAD_TARGET_COUNT} {genreFilter} titles found. Clear the
+          filter to keep browsing everything else.
+        </p>
+      )}
+
       {hasMore && (
+        // No visible button anymore — this div stays only as the
+        // IntersectionObserver's scroll target (see the effect above),
+        // so scrolling near the bottom still auto-loads the next batch.
+        // The status text is the only thing rendered, and only while a
+        // batch is actually in flight.
         <div className="movie-search__load-more" ref={loadMoreSentinelRef}>
-          {loadingMoreAny ? (
+          {loadingMoreAny && (
             <span className="movie-search__load-more-status" role="status">
               Loading more…
             </span>
-          ) : (
-            // Always rendered now (not just as an IntersectionObserver
-            // fallback) — scrolling near the sentinel above still
-            // auto-loads the next batch on browsers that support it, but
-            // this gives visitors an explicit, reliable control too
-            // instead of relying purely on scroll position.
-            <button type="button" className="movie-search__load-more-btn" onClick={loadMore}>
-              {searched ? `Load more (${movies.length} of ${totalResults})` : "Load more"}
-            </button>
           )}
         </div>
+      )}
+
+      {!activeLoading && searched && searchExhausted && movies.length > 0 && movies.length < totalResults && (
+        <p className="movie-search__status" role="status">
+          That's as far as OMDb's search results go for this query — try narrowing your search
+          to find more specific titles.
+        </p>
+      )}
+
+      {!activeLoading && searched && !searchExhausted && searchCapped && movies.length < totalResults && (
+        <p className="movie-search__status" role="status">
+          Showing the first {AUTO_LOAD_TARGET_COUNT} of {totalResults} results — narrow your
+          search to find more specific titles.
+        </p>
       )}
 
       {!activeLoading && !searched && !error && activeMovies.length === 0 && (

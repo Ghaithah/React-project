@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+.genres-page {
+  --bg: #0d0f14;
+  --surface: #14181f;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.genres-page__title {
+  text-align: center;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+  color: var(--cream);
+}
+
+.genres-page__subtitle {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0 0 32px;
+}
+
+.genres-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 18px;
+}
+
+.genres-page__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--cream);
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  text-align: center;
+  padding: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.genres-page__tile:hover,
+.genres-page__tile:focus-visible {
+  transform: translateY(-3px);
+  border-color: var(--gold-dim);
+  box-shadow: 0 10px 24px rgba(232, 176, 75, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .genres-page__tile {
+    transition: none;
+  }
+}

@@ -16,6 +16,15 @@ function SplashScreen({ onFinish }) {
   const timers = useRef([]);
 
   useEffect(() => {
+    // Captured once per effect run rather than read again inside the
+    // cleanup via `timers.current` — the array itself is a stable
+    // reference (created once by useRef and only ever pushed into, never
+    // reassigned), but eslint-plugin-react-hooks can't prove that
+    // statically and flags any `.current` read inside a cleanup closure.
+    // Using a local variable throughout satisfies the rule and is
+    // functionally identical.
+    const timerIds = timers.current;
+
     const prefersReducedMotion =
       typeof window !== 'undefined' && window.matchMedia
         ? window.matchMedia(REDUCED_MOTION_QUERY).matches
@@ -23,15 +32,15 @@ function SplashScreen({ onFinish }) {
 
     if (prefersReducedMotion) {
       // Skip the animated sequence; show the mark briefly then continue.
-      timers.current.push(setTimeout(onFinish, 500));
-      return () => timers.current.forEach(clearTimeout);
+      timerIds.push(setTimeout(onFinish, 500));
+      return () => timerIds.forEach(clearTimeout);
     }
 
-    timers.current.push(setTimeout(() => setPhase('hold'), 700));
-    timers.current.push(setTimeout(() => setPhase('exit'), 1900));
-    timers.current.push(setTimeout(onFinish, 2500));
+    timerIds.push(setTimeout(() => setPhase('hold'), 700));
+    timerIds.push(setTimeout(() => setPhase('exit'), 1900));
+    timerIds.push(setTimeout(onFinish, 2500));
 
-    return () => timers.current.forEach(clearTimeout);
+    return () => timerIds.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

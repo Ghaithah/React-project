@@ -77,8 +77,17 @@
   gap: 12px;
 }
 
-.movie-search__input {
+/* Wraps just the text input (not the Filters button next to it) so the
+   suggestions dropdown below can be positioned relative to the input
+   alone, matching its width instead of spanning the whole search row. */
+.movie-search__search-field {
+  position: relative;
   flex: 1;
+  min-width: 0;
+}
+
+.movie-search__input {
+  width: 100%;
   box-sizing: border-box;
   padding: 14px 16px;
   font-size: 1rem;
@@ -98,6 +107,140 @@
 .movie-search__input:focus {
   border-color: var(--gold);
   box-shadow: 0 0 0 3px rgba(232, 176, 75, 0.18);
+}
+
+/* --- Search suggestions dropdown (typeahead + recent searches) ---
+   A floating panel anchored under the search input: poster-thumbnail
+   matches while typing, or a short list of recent search terms when the
+   input is focused and empty. Positioned absolutely against
+   .movie-search__search-field above so it never affects the layout of
+   anything below it (the hero banner / grid don't shift when it opens). */
+.movie-search__suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.movie-search__suggestions::-webkit-scrollbar {
+  width: 6px;
+}
+
+.movie-search__suggestions::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.movie-search__suggestions-status {
+  padding: 14px 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.movie-search__suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.movie-search__suggestions-clear {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--gold-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.movie-search__suggestions-clear:hover {
+  color: var(--gold);
+}
+
+.movie-search__suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.movie-search__suggestion:hover,
+.movie-search__suggestion.is-highlighted {
+  background: var(--surface-2);
+}
+
+.movie-search__suggestion-poster {
+  flex: none;
+  width: 34px;
+  height: 48px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.movie-search__suggestion-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.movie-search__suggestion-poster-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+}
+
+.movie-search__suggestion-info {
+  min-width: 0;
+}
+
+.movie-search__suggestion-title {
+  margin: 0 0 2px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cream);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.movie-search__suggestion-meta {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.movie-search__suggestion--recent {
+  gap: 8px;
+}
+
+.movie-search__suggestion-recent-icon {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .movie-search__filter-toggle {
@@ -742,6 +885,39 @@
   text-transform: uppercase;
   color: var(--gold-dim);
   margin: 0 0 12px;
+}
+
+/* Wraps a genre shelf's heading + its "See All" link on one line — only
+   the genre shelves use this (Continue Watching / My List / Because You
+   Watched keep a plain heading, since "See All" wouldn't have anywhere
+   further to send you for those). */
+.movie-search__row-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.movie-search__row-header .movie-search__section-title {
+  margin-bottom: 0;
+}
+
+.movie-search__row-seeall {
+  flex: none;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.movie-search__row-seeall:hover,
+.movie-search__row-seeall:focus-visible {
+  color: var(--gold);
 }
 
 /* --- Browse rows (Continue Watching, My List, Because You Watched,
