@@ -100,6 +100,28 @@ const MAX_COMBO_ADVANCE_PER_LOAD = 8;
 // browse batch is loading.
 const BROWSE_SKELETON_COUNT = 10;
 
+// --- Shuffle helper ---
+// Plain Fisher-Yates, used in two places: (1) randomizing the order
+// BROWSE_QUERY_TERMS[_KIDS] gets walked each session (see
+// shuffledTermsRef below), so the browse pool isn't always seeded by the
+// same "the" -> "man" -> "love" -> ... sequence every time — "man" in
+// particular is a title-text match for Iron Man/Spider-Man/Ant-Man/Ant-Man
+// and the Wasp/Spider-Man: No Way Home all at once, and being 2nd in the
+// list meant those few franchises dominated the very first batch of
+// browseMovies almost every session; and (2) the order each genre shelf's
+// movies render in (see genreRows below), since without it a genre row
+// always shows the same handful of titles up front — whichever ones
+// happened to load first — every time you reload the page. Never mutates
+// its input.
+function shuffleArray(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 
 const SIMILAR_POOL_IDS = [
   "tt0109830", // Forrest Gump
@@ -326,6 +348,235 @@ function setCachedDetail(imdbID, data) {
   persistDetailCacheStore();
 }
 
+// --- Persistent trailer-id cache (localStorage) ---
+// YouTube's search.list endpoint is the most expensive call this app
+// makes — 100 quota units per request against a free key's 10,000/day
+// budget — and MovieCard's hover preview (see MovieCard.js) calls
+// resolveTrailerId for essentially every poster a visitor's pointer
+// lingers over across every row and grid. Before this, resolved video
+// ids only lived in the component-scoped `trailerCache` ref below, so
+// they reset on every page reload — meaning a page refresh during
+// ordinary browsing re-spent quota re-searching the same handful of
+// popular titles. Persisting to localStorage (same pattern as
+// DETAIL_CACHE_KEY above) makes repeat lookups — across reloads, and
+// across every row a title happens to appear in — free. Trailers
+// essentially never change once found, so the TTL here is long. A
+// cached `null` (searched, nothing found) is stored too, so a title with
+// no trailer isn't re-searched every time it's hovered.
+const TRAILER_CACHE_KEY = "movieSearch:trailerCache:v1";
+const TRAILER_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const TRAILER_CACHE_MAX_ENTRIES = 500;
+
+let trailerCacheStore = null;
+
+function loadTrailerCacheStore() {
+  if (trailerCacheStore) return trailerCacheStore;
+  try {
+    const raw = window.localStorage.getItem(TRAILER_CACHE_KEY);
+    trailerCacheStore = raw ? JSON.parse(raw) : {};
+    if (!trailerCacheStore || typeof trailerCacheStore !== "object") trailerCacheStore = {};
+  } catch {
+    trailerCacheStore = {};
+  }
+  return trailerCacheStore;
+}
+
+function persistTrailerCacheStore() {
+  try {
+    window.localStorage.setItem(TRAILER_CACHE_KEY, JSON.stringify(trailerCacheStore));
+  } catch {
+    // Storage full/unavailable — persistent caching is a nice-to-have.
+  }
+}
+
+// Returns `undefined` when nothing usable is cached (never looked up, or
+// the entry expired) so callers can tell that apart from a cached
+// lookup that resolved to `null` (searched, no trailer found).
+function getCachedTrailerId(imdbID) {
+  const store = loadTrailerCacheStore();
+  const entry = store[imdbID];
+  if (!entry || typeof entry.savedAt !== "number") return undefined;
+  if (Date.now() - entry.savedAt > TRAILER_CACHE_TTL_MS) return undefined;
+  return entry.videoId;
+}
+
+function setCachedTrailerId(imdbID, videoId) {
+  const store = loadTrailerCacheStore();
+  store[imdbID] = { savedAt: Date.now(), videoId };
+
+  const keys = Object.keys(store);
+  if (keys.length > TRAILER_CACHE_MAX_ENTRIES) {
+    keys
+      .sort((a, b) => store[a].savedAt - store[b].savedAt)
+      .slice(0, keys.length - TRAILER_CACHE_MAX_ENTRIES)
+      .forEach((k) => delete store[k]);
+  }
+
+  persistTrailerCacheStore();
+}
+
+// --- YouTube search request budget + throttle ---
+// search.list is YouTube's most expensive endpoint (100 quota units per
+// call) and Google enforces two separate limits on top of each other: a
+// short burst-rate window (what actually surfaces as an HTTP 429 in the
+// console) and a hard total daily quota per key. The previous version of
+// this only reacted to a 429 after the fact (a short cooldown once one
+// came back) — that stops the immediate hammering but does nothing to
+// stop the *next* burst from tripping the limiter again a minute later.
+// This version instead keeps requests under both ceilings proactively,
+// so a 429 shouldn't happen at all under normal browsing:
+//
+//   1. A conservative daily request budget (YOUTUBE_DAILY_REQUEST_LIMIT)
+//      is tracked in localStorage — same date-keyed pattern as
+//      trackOmdbRequest above — and checked BEFORE a request is ever
+//      sent. Once today's budget is spent, resolveTrailerId resolves
+//      locally to "no trailer" with zero network calls, rather than
+//      firing a request that would likely just fail anyway.
+//   2. Requests that are still within budget are serialized through a
+//      queue with a wide minimum spacing (well under one request per
+//      second), keeping the sustained rate safely inside Google's
+//      short-window limiter regardless of how many distinct titles get
+//      hovered in a session.
+//
+// If a 429 slips through anyway — the key's real quota turns out lower
+// than assumed, or something else shares the same key — that single
+// response immediately zeroes out the rest of today's budget too, so
+// this goes quiet on trailer lookups for the remainder of the day
+// instead of retrying into more errors. Budget-skipped lookups are
+// deliberately NOT written to the persistent trailer cache (see
+// resolveTrailerId below) — "we didn't check" must stay distinct from
+// "we checked and found nothing," or a title would be permanently
+// mislabeled as trailer-less just because it was hovered on a
+// budget-exhausted day.
+const YOUTUBE_MIN_REQUEST_SPACING_MS = 1500; // ~40 req/min sustained — well under Google's short-window limit
+const YOUTUBE_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000; // fallback in-memory cooldown, belt-and-suspenders with the budget below
+
+const YOUTUBE_REQUEST_COUNT_KEY = "movieSearch:youtubeRequestCount:v1";
+// Deliberately conservative: a fresh/free YouTube Data API key's default
+// quota (10,000 units/day ÷ 100 units per search.list call) works out to
+// ~100 searches/day. Capping ourselves at 90 leaves headroom for
+// whatever the real number actually is instead of aiming right at the
+// edge of it.
+const YOUTUBE_DAILY_REQUEST_LIMIT = 90;
+const YOUTUBE_BUDGET_WARN_AT = 80; // dev-console heads-up threshold
+
+function youtubeDateStamp() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD, UTC
+}
+
+function readYoutubeRequestCount() {
+  try {
+    const raw = window.localStorage.getItem(YOUTUBE_REQUEST_COUNT_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || parsed.date !== youtubeDateStamp()) return 0;
+    return parsed.count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+let youtubeBudgetWarned = false;
+
+function bumpYoutubeRequestCount() {
+  try {
+    const today = youtubeDateStamp();
+    const count = readYoutubeRequestCount() + 1;
+    window.localStorage.setItem(YOUTUBE_REQUEST_COUNT_KEY, JSON.stringify({ date: today, count }));
+    if (process.env.NODE_ENV !== "production" && !youtubeBudgetWarned && count >= YOUTUBE_BUDGET_WARN_AT) {
+      youtubeBudgetWarned = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[MovieSearch] YouTube trailer lookups today: ${count}/${YOUTUBE_DAILY_REQUEST_LIMIT} — ` +
+          "approaching today's self-imposed budget; trailer previews will start " +
+          "resolving to \"not found\" locally (no request sent) once it's reached."
+      );
+    }
+    return count;
+  } catch {
+    return null;
+  }
+}
+
+// Forces the rest of today's budget to read as spent. Used the moment a
+// real 429 comes back, so — even though the count above is meant to stay
+// well clear of the actual quota — an actual quota lower than assumed
+// still results in "quiet for the rest of the day" rather than repeat
+// errors.
+function exhaustYoutubeBudgetForToday() {
+  try {
+    window.localStorage.setItem(
+      YOUTUBE_REQUEST_COUNT_KEY,
+      JSON.stringify({ date: youtubeDateStamp(), count: YOUTUBE_DAILY_REQUEST_LIMIT })
+    );
+  } catch {
+    // Nothing to persist — the in-memory cooldown below still covers the
+    // rest of this page load.
+  }
+}
+
+let youtubeQueueTail = Promise.resolve();
+let youtubeCooldownUntil = 0;
+
+function queueYoutubeRequest(fn) {
+  const runAfterSpacing = () =>
+    new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (Date.now() < youtubeCooldownUntil) {
+          reject(new Error("youtube-rate-limited"));
+          return;
+        }
+        fn().then(resolve, reject);
+      }, YOUTUBE_MIN_REQUEST_SPACING_MS);
+    });
+
+  const scheduled = youtubeQueueTail.then(runAfterSpacing, runAfterSpacing);
+  // Keep the chain alive regardless of this call's outcome — one failed
+  // or rate-limited lookup must not stall every request queued behind it.
+  youtubeQueueTail = scheduled.catch(() => {});
+  return scheduled;
+}
+
+// A sentinel (rather than throwing, or resolving with fabricated "no
+// results" data) so resolveTrailerId below can tell "skipped, don't
+// cache this" apart from a genuine empty search response.
+const YOUTUBE_BUDGET_SKIPPED = { budgetSkipped: true };
+
+// Single-request counterpart to fetchOmdb above: every YouTube
+// search.list call in this file goes through this, so the daily budget,
+// throttled spacing, persistent caching, and 429 backoff all apply
+// uniformly regardless of whether the call came from opening a trailer
+// or a hover preview.
+function fetchYoutubeSearch(url) {
+  if (readYoutubeRequestCount() >= YOUTUBE_DAILY_REQUEST_LIMIT) {
+    return Promise.resolve(YOUTUBE_BUDGET_SKIPPED);
+  }
+
+  return queueYoutubeRequest(() => {
+    // Re-check right before actually sending: several lookups can be
+    // queued back-to-back before the count below updates, so this catches
+    // the request that would otherwise push slightly past the budget.
+    if (readYoutubeRequestCount() >= YOUTUBE_DAILY_REQUEST_LIMIT) {
+      return Promise.resolve(YOUTUBE_BUDGET_SKIPPED);
+    }
+    bumpYoutubeRequestCount();
+    return fetch(url).then((res) => {
+      if (res.status === 429) {
+        youtubeCooldownUntil = Date.now() + YOUTUBE_RATE_LIMIT_COOLDOWN_MS;
+        exhaustYoutubeBudgetForToday();
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[MovieSearch] YouTube search rate-limited (429) — treating today's " +
+              "trailer-lookup budget as spent; will resume automatically tomorrow."
+          );
+        }
+        throw new Error("youtube-rate-limited");
+      }
+      return res.json();
+    });
+  });
+}
+
 // --- Recent searches (search suggestions dropdown) ---
 // A small, per-browser list of the most recent committed search terms —
 // "committed" meaning the visitor pressed Enter or picked a suggestion,
@@ -531,12 +782,25 @@ const GENRE_ROW_ORDER = [
   "War",
   "Biography",
 ];
-// A row that can't fill out a decent-looking shelf (regular pool is
-// large; the curated Kids pool is much smaller) just isn't shown — better
-// no row than a row with three posters and a lot of empty space.
-const MIN_ROW_SIZE = 6;
-const MIN_ROW_SIZE_KIDS = 4;
+// Every genre needs at least this many loaded, matching titles before it
+// gets its own shelf. A genre with only one or two posters reads as
+// broken, not curated — this used to be set to 1 so that literally every
+// genre present in the pool got a row (see the comment that used to be
+// here), but that's exactly what made the browse page feel like a long
+// tail of half-empty shelves (Documentary, War, Biography, Mystery, ...)
+// rather than a small set of categories that actually feel full. Raising
+// the bar means a shelf only appears once there's enough of that genre
+// loaded to fill a meaningful chunk of ROW_ITEM_CAP.
+const MIN_ROW_SIZE = 10;
+const MIN_ROW_SIZE_KIDS = 6; // the Kids term pool is smaller, so this stays a lower bar
 const ROW_ITEM_CAP = 15;
+// On top of the size bar above, cap how many shelves show at once even
+// if more genres qualify — otherwise a well-loaded pool (lots of browse
+// pages fetched) would just turn the size filter into "every genre
+// eventually gets a row anyway," recreating the same long-tail problem
+// one scroll further down. GENRE_ROW_ORDER's priority order (below)
+// decides which qualifying genres win the available slots.
+const MAX_GENRE_ROWS = 8;
 
 // --- "Because You Watched" personalized rows ---
 // How many of the most-recently-opened Continue Watching titles get their
@@ -627,10 +891,10 @@ export default function MovieSearch() {
   const [loadingMore, setLoadingMore] = useState(false);
   // Set once a search's pagination can't advance any further — either
   // OMDb has genuinely run out of pages for this query, or the query hit
-  // OMDb's hard cap on how many results a single `s=` search can page
-  // through (its own search endpoint stops serving pages once you're
-  // roughly 1,000 results in, well before `totalResults` for a broad
-  // query like "the" ever reaches zero remaining). Without this,
+  // OMDb's hard cap on how far a single `s=` search can page through (its
+  // own search endpoint stops serving pages once you're roughly 1,000
+  // results in, well before `totalResults` for a broad query like "the"
+  // ever reaches zero remaining). Without this,
   // `searched && movies.length < totalResults` stays true forever for
   // any broad query, so "Load more"/infinite-scroll keeps trying (and
   // silently failing) indefinitely once that ceiling is hit.
@@ -642,14 +906,22 @@ export default function MovieSearch() {
   const [browseLoadingMore, setBrowseLoadingMore] = useState(false);
   const [browseExhausted, setBrowseExhausted] = useState(false);
   // Where the "infinite" browse loader currently is in the term x year
-  // combo space (see BROWSE_QUERY_TERMS/BROWSE_QUERY_YEARS above) and
-  // which OMDb results page it's on within that combo. Refs rather than
-  // state because fetchNextBrowseBatch below advances them step-by-step
-  // inside a single async call (possibly several times per click, per
-  // MAX_COMBO_ADVANCE_PER_LOAD) — turning every step into a state update
-  // would both be unnecessary re-renders and racy across steps.
+  // combo space (see BROWSE_QUERY_TERMS[_KIDS]/BROWSE_QUERY_YEARS above)
+  // and which OMDb results page it's on within that combo. Refs rather
+  // than state because fetchNextBrowseBatch below advances them
+  // step-by-step inside a single async call (possibly several times per
+  // click, per MAX_COMBO_ADVANCE_PER_LOAD) — turning every step into a
+  // state update would both be unnecessary re-renders and racy across
+  // steps.
   const browseComboIndexRef = useRef(0);
   const browseComboPageRef = useRef(1);
+  // A freshly-shuffled copy of BROWSE_QUERY_TERMS[_KIDS], re-rolled on
+  // mount and whenever kidsMode flips (see the reset effect right below)
+  // — see shuffleArray's comment above for why this exists. combo %
+  // terms.length in fetchNextBrowseBatch indexes into THIS array, not the
+  // static term list, so which term a given combo number maps to varies
+  // session to session while combo math itself is untouched.
+  const shuffledTermsRef = useRef([]);
   // Every imdbID the browse loader has already surfaced, across every
   // term/year combo queried so far this session — search terms overlap
   // a lot ("war" and "the" both turn up plenty of the same titles), so
@@ -743,6 +1015,9 @@ export default function MovieSearch() {
     setBrowseLoading(true);
     setBrowseWarning("");
     setBrowseExhausted(false);
+    shuffledTermsRef.current = shuffleArray(
+      kidsMode ? BROWSE_QUERY_TERMS_KIDS : BROWSE_QUERY_TERMS
+    );
     browseComboIndexRef.current = 0;
     browseComboPageRef.current = 1;
     browseSeenIdsRef.current = new Set();
@@ -787,7 +1062,12 @@ export default function MovieSearch() {
   // already seen (browseSeenIdsRef) are filtered out so the same title
   // never shows up twice across two overlapping search terms.
   async function fetchNextBrowseBatch() {
-    const terms = kidsMode ? BROWSE_QUERY_TERMS_KIDS : BROWSE_QUERY_TERMS;
+    // Falls back to the unshuffled list only in the (normally impossible)
+    // case this runs before the reset effect above has had a chance to
+    // populate shuffledTermsRef — keeps this function safe to call early
+    // rather than throwing on an empty array.
+    const fallbackTerms = kidsMode ? BROWSE_QUERY_TERMS_KIDS : BROWSE_QUERY_TERMS;
+    const terms = shuffledTermsRef.current.length > 0 ? shuffledTermsRef.current : fallbackTerms;
     const totalCombos = terms.length * BROWSE_QUERY_YEARS.length;
     let collected = [];
 
@@ -1258,9 +1538,13 @@ export default function MovieSearch() {
   // --- Derived: genre-based browse rows ---
   // Groups the curated browse pool by genre into Netflix-style shelves.
   // Only ever built from browseMovies (never search results — a search
-  // is a single flat list of matches, rows would just be noise there),
-  // and only shown once a genre has enough titles to fill a real row
-  // (see MIN_ROW_SIZE/MIN_ROW_SIZE_KIDS above).
+  // is a single flat list of matches, rows would just be noise there).
+  // Two gates keep this to a small set of categories that are actually
+  // full of movies rather than a long tail of thin ones: a genre needs
+  // at least MIN_ROW_SIZE[_KIDS] matching titles to earn a shelf at all,
+  // and even after that filter, only the top MAX_GENRE_ROWS survive —
+  // GENRE_ROW_ORDER's priority list decides which qualifying genres get
+  // the available slots, with anything else alphabetized after.
   const genreRows = useMemo(() => {
     const pool = kidsMode ? browseMovies.filter(isKidSafe) : browseMovies;
     const minSize = kidsMode ? MIN_ROW_SIZE_KIDS : MIN_ROW_SIZE;
@@ -1285,8 +1569,22 @@ export default function MovieSearch() {
     ];
 
     return orderedGenres
-      .map((genre) => ({ genre, movies: byGenre.get(genre).slice(0, ROW_ITEM_CAP) }))
-      .filter((row) => row.movies.length >= minSize);
+      .map((genre) => ({
+        // Shuffled rather than left in fetch order — otherwise a row
+        // always shows the exact same leading titles every time the page
+        // loads (whichever browse-pool entries happened to be found
+        // first), which is what made a couple of title-text-heavy
+        // searches like "man" (Iron Man/Spider-Man/Ant-Man) look like
+        // they were the row's whole contents.
+        genre,
+        movies: shuffleArray(byGenre.get(genre)).slice(0, ROW_ITEM_CAP),
+      }))
+      .filter((row) => row.movies.length >= minSize)
+      // Cap AFTER filtering for fullness, not before — a genre that's
+      // merely early in GENRE_ROW_ORDER but too thin right now shouldn't
+      // burn one of the limited slots ahead of a well-stocked genre that
+      // happens to sort later.
+      .slice(0, MAX_GENRE_ROWS);
   }, [browseMovies, kidsMode]);
 
   // Rows only replace the flat grid on the plain browse view — once a
@@ -1683,26 +1981,46 @@ export default function MovieSearch() {
 
   // Resolves a movie's trailer video id, sharing one cache (trailerCache)
   // across every caller: the main trailer panel below AND every
-  // MovieCard's hover preview. Resolves to `null` (not a rejection) when
-  // the search genuinely turns up nothing; a rejected promise means the
-  // request itself failed, which callers can tell apart to show a more
-  // specific error if they want to (the main trailer panel does; hover
-  // previews just treat it the same as "nothing found").
+  // MovieCard's hover preview. Resolution now goes through three tiers
+  // before ever touching the network: the component-scoped trailerCache
+  // ref (free, but reset on reload), then the persistent localStorage
+  // cache (getCachedTrailerId — free, survives reloads, shared by every
+  // title this browser has ever resolved), and only then an actual
+  // search.list call — routed through fetchYoutubeSearch/
+  // queueYoutubeRequest so it's spaced out and backs off automatically
+  // if YouTube starts returning 429s. Resolves to `null` (not a
+  // rejection) when the search genuinely turns up nothing; a rejected
+  // promise means the request itself failed (network error, or the
+  // rate-limit cooldown is active), which callers can tell apart to show
+  // a more specific error if they want to (the main trailer panel does;
+  // hover previews just treat it the same as "nothing found").
   const resolveTrailerId = useCallback((movie) => {
     const cached = trailerCache.current[movie.imdbID];
     if (cached !== undefined) return Promise.resolve(cached);
 
+    const persisted = getCachedTrailerId(movie.imdbID);
+    if (persisted !== undefined) {
+      trailerCache.current[movie.imdbID] = persisted;
+      return Promise.resolve(persisted);
+    }
+
     const q = encodeURIComponent(`${movie.Title} ${movie.Year} official trailer`);
-    return fetch(
+    return fetchYoutubeSearch(
       `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=${q}&key=${YOUTUBE_API_KEY}`
-    )
-      .then((res) => res.json())
-      .then((data) => {
-        const videoId =
-          data.items && data.items[0] && data.items[0].id ? data.items[0].id.videoId : null;
-        trailerCache.current[movie.imdbID] = videoId || null;
-        return videoId || null;
-      });
+    ).then((data) => {
+      if (data && data.budgetSkipped) {
+        // Today's self-imposed request budget is spent — resolve as "no
+        // trailer, for now" WITHOUT writing to either cache, so this
+        // title gets a real lookup (not a permanently-stuck negative)
+        // the next time it's hovered/opened once the budget resets.
+        return null;
+      }
+      const videoId =
+        data.items && data.items[0] && data.items[0].id ? data.items[0].id.videoId : null;
+      trailerCache.current[movie.imdbID] = videoId || null;
+      setCachedTrailerId(movie.imdbID, videoId || null);
+      return videoId || null;
+    });
   }, []);
 
   // Does the actual trailer + detail fetching for a resolved movie object.

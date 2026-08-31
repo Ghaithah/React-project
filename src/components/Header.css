@@ -103,3 +103,68 @@
 .app-header__profile-avatar .profile-avatar__badge {
   display: none;
 }
+
+/* ---- Small screens ----
+   Header.js's nav bar is a plain flex row (brand on the left, a
+   .nav list of items on the right) with no navbar-collapse/hamburger
+   behind it. On a phone, once a profile is active, the row has to fit
+   the brand + "Genres" + the profile avatar + a "Welcome, {name}" line
+   + a Logout button all at once — that doesn't fit under ~640px, so
+   (thanks to Bootstrap's .nav being flex-wrap: wrap by default) it
+   wrapped onto two extra lines below the brand instead of overflowing.
+   Nothing broke, but it ate a large chunk of the screen before any
+   real content showed. Rather than build out a full collapse/hamburger
+   for what's only ever 3-4 items, this trims the row down to what
+   actually needs to be there on a phone: the welcome text is dropped
+   (purely redundant with the avatar sitting right next to it — that's
+   the single biggest chunk of text in the bar), everything else is
+   tightened up, and on very narrow phones the wordmark itself gives way
+   to just the logo mark. That's enough for the remaining items (icon,
+   Genres, avatar, Logout) to comfortably stay on one line down to a
+   320px-wide screen. */
+@media (max-width: 640px) {
+  .app-header .container {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .app-header__welcome {
+    display: none;
+  }
+
+  .app-header ul.nav {
+    column-gap: 4px;
+  }
+
+  .app-header .nav-link {
+    padding: 0.5rem 0.55rem;
+    font-size: 0.88rem;
+  }
+
+  .app-header__profile-avatar {
+    margin-right: 4px;
+  }
+}
+
+/* Below this, even the tightened-up wordmark plus the rest of the nav
+   is too much for one line on the narrowest phones (~360px and down) —
+   drop the "Watch & Wonder" text and keep just the logo mark. The brand
+   Link still carries its full aria-label, so it's still announced
+   correctly with the visible text gone. */
+@media (max-width: 380px) {
+  .app-header__brand-text {
+    display: none;
+  }
+
+  .app-header .navbar-brand {
+    gap: 0 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-header__brand,
+  .app-header__profile-avatar,
+  .app-header__profile-avatar .profile-avatar {
+    transition: none;
+  }
+}

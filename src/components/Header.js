@@ -38,7 +38,12 @@ function Header(props) {
           aria-label="Watch & Wonder — back to browse"
         >
           <Logo height={48} showWordmark={false} />
-          Watch & Wonder
+          {/* Wrapped in its own span (rather than left as bare text next
+              to the logo) so the narrowest phone widths can drop just
+              this wordmark via CSS — see the max-width: 480px rule in
+              Header.css — while the Link keeps its aria-label so the
+              brand is still announced correctly with the text hidden. */}
+          <span className="app-header__brand-text">Watch & Wonder</span>
         </Link>
 
         <ul className="nav align-items-center mb-0">
@@ -68,9 +73,15 @@ function Header(props) {
                   {/* The greeting is keyed off the active PROFILE's name
                       (e.g. "Courtney"), not the account's login email —
                       each profile sets its own display name from the
-                      "Who's watching?" screen. */}
+                      "Who's watching?" screen. Hidden below 640px (see
+                      Header.css) since it's the single biggest chunk of
+                      text in the bar and purely redundant with the
+                      profile avatar sitting right next to it — losing
+                      it is what keeps the rest of the nav on one line
+                      on a phone instead of wrapping onto a second/third
+                      row underneath the brand. */}
                   <li className="nav-item">
-                    <span className="nav-link text-white">Welcome, {activeProfile.name}</span>
+                    <span className="nav-link text-white app-header__welcome">Welcome, {activeProfile.name}</span>
                   </li>
                 </>
               )}
