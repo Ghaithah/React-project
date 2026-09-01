@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Same page shell as Genres.css (max-width, dark palette variables,
+   Bebas Neue title) so this reads as the same app rather than a
+   bolted-on screen — each top-level page redeclares these variables
+   locally rather than relying on MovieSearch.css's .movie-search scope,
+   since none of these pages nest inside that component. */
+.my-list-page {
+  --bg: #0d0f14;
+  --surface: #14181f;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.my-list-page__title {
+  text-align: center;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 0 0 32px;
+  color: var(--cream);
+}
+
+.my-list-page__empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-top: 40px;
+}
+
+.my-list-page__empty strong {
+  color: var(--gold);
+}
+
+/* Same card grid MovieSearch.css uses for its own "Popular Right Now" /
+   filtered grid (.movie-search__grid) — reused by class name here too so
+   a MovieCard dropped into either page lines up identically. */
+.my-list-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+}

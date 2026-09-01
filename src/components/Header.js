@@ -59,6 +59,15 @@ function Header(props) {
                   <li className="nav-item">
                     <Link className="nav-link" to="/genres">Genres</Link>
                   </li>
+                  {/* Same reasoning as Genres above, for My List (see
+                      components/MyListPage.js): before this, the only
+                      way to see what you'd saved was a shelf on the
+                      plain browse view — easy to scroll past, and gone
+                      entirely while searching/filtering. This gives it
+                      a permanent, findable spot in the nav instead. */}
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/my-list">My List</Link>
+                  </li>
                   <li className="nav-item">
                     <button
                       type="button"

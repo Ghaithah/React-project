@@ -158,11 +158,13 @@
   margin-bottom: 18px;
 }
 
-/* Wraps Play Trailer + the (optional) My List button so they sit side
-   by side — previously just the lone play button rendered here. */
+/* Wraps Play Trailer + the (optional) My List button + the (optional)
+   thumbs group so they all sit side by side — previously just the lone
+   play button rendered here. */
 .movie-info-modal__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
 }
 
@@ -217,6 +219,56 @@
   background: rgba(232, 176, 75, 0.16);
   color: #e8b04b;
   border-color: #e8b04b;
+}
+
+/* --- Thumbs up/down ---
+   Same compact, icon-only, grayscale-until-rated treatment as
+   HeroBanner's .hero-banner__rate-btn — see the comment there for why
+   these are deliberately not styled as a third pill button. */
+.movie-info-modal__rate-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.movie-info-modal__rate-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.75;
+  transition: filter 0.15s ease, opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.movie-info-modal__rate-btn:hover,
+.movie-info-modal__rate-btn:focus-visible {
+  filter: grayscale(0.4);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.movie-info-modal__rate-btn.is-active {
+  filter: grayscale(0);
+  opacity: 1;
+}
+
+.movie-info-modal__rate-btn--like.is-active {
+  border-color: #4caf7d;
+  background: rgba(76, 175, 125, 0.18);
+}
+
+.movie-info-modal__rate-btn--dislike.is-active {
+  border-color: #e2645a;
+  background: rgba(226, 100, 90, 0.18);
 }
 
 /* --- Body: plot + facts + (reused) person/episodes/similar sections.
@@ -280,7 +332,8 @@
 
   .movie-info-modal__close,
   .movie-info-modal__play-btn,
-  .movie-info-modal__list-btn {
+  .movie-info-modal__list-btn,
+  .movie-info-modal__rate-btn {
     transition: none;
   }
 }

@@ -1288,13 +1288,16 @@
   padding: 2px 6px;
 }
 
-/* Row that holds the hover Play button + the My List toggle side by
-   side — previously Play rendered directly inside .movie-card__hover-overlay
-   on its own; this wrapper just gives it a sibling without changing its
-   own alignment/spacing. */
+/* Row that holds the hover Play button + the My List toggle + the thumbs
+   pair side by side — previously Play rendered directly inside
+   .movie-card__hover-overlay on its own; this wrapper just gives it
+   siblings without changing its own alignment/spacing. Allowed to wrap
+   onto a second line (flex-wrap) since the "row" card variant is only
+   170px wide and four small controls plus Play can get tight there. */
 .movie-card__hover-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1352,6 +1355,53 @@
   border-color: var(--gold);
   background: var(--gold);
   color: #1a1400;
+}
+
+/* Thumbs up/down toggles, same circular footprint as the My List toggle
+   right above so all three controls line up. Grayscale + slightly faded
+   by default (nothing rated yet reads as "unrated," not "broken icon"),
+   full color once active — green for a like, crimson (reusing the same
+   --crimson token .movie-search already defines) for a dislike, distinct
+   from the gold used for My List/selection so all three states (saved,
+   liked, disliked) stay visually unambiguous next to each other. */
+.movie-card__rate-toggle {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(13, 15, 20, 0.55);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: grayscale(1);
+  opacity: 0.8;
+  transition: border-color 0.15s ease, background 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+}
+
+.movie-card__rate-toggle:hover,
+.movie-card__rate-toggle:focus-visible {
+  border-color: var(--gold-dim);
+  filter: grayscale(0.4);
+  opacity: 1;
+}
+
+.movie-card__rate-toggle.is-active {
+  filter: grayscale(0);
+  opacity: 1;
+}
+
+.movie-card__rate-toggle--like.is-active {
+  border-color: #4caf7d;
+  background: rgba(76, 175, 125, 0.22);
+}
+
+.movie-card__rate-toggle--dislike.is-active {
+  border-color: var(--crimson);
+  background: rgba(226, 100, 90, 0.22);
 }
 
 .movie-card__info {
@@ -1486,6 +1536,7 @@
   .movie-card__hover-overlay,
   .movie-card__hover-play,
   .movie-card__list-toggle,
+  .movie-card__rate-toggle,
   .movie-card__remove-badge,
   .movie-card__mute-toggle,
   .movie-search__trending-poster-wrap {

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useProfiles } from "./ProfileContext";
 import { useWatchHistory } from "./WatchHistoryContext";
 import { useMyList } from "./MyListContext";
+import { useRatings } from "./RatingsContext";
 import HeroBanner from "./HeroBanner";
 import MovieCard from "./MovieCard";
 import MovieInfoModal from "./MovieInfoModal";
@@ -239,66 +240,24 @@ const CURATED_TRAILER_IDS = {
 // vanish from the grid with zero indication anything went wrong. Routing
 // every OMDb fetch through this small worker pool keeps at most
 // FETCH_CONCURRENCY requests in flight at a time.
-//
-// Raised from 5 to 8: with only 5 in flight, a batch needing detail
-// lookups for 10+ titles (a full browse page, or the similar-titles
-// pool) took two or three fully-sequential rounds — each individually
-// fast (~350-450ms) — to finish enriching, and that sequential stacking
-// was what pushed the page's visible "settle" time up near 2s even
-// though no single request was actually slow. 8 clears a same-size
-// batch in one or two rounds instead. This does raise the odds of
-// occasionally tripping OMDb's short-burst rate limiter, so the retry
-// below absorbs that instead of silently giving up on the title.
-const FETCH_CONCURRENCY = 8;
-
-// How long to pause before re-trying a single request that came back
-// rate-limited. Without this, a rate-limited response would be treated
-// exactly like a genuine "nothing found" by the caller (mergeDetailIntoMovie
-// sets Genre: "" when no matching detail comes back) — permanently
-// blanking that title's genre/rating for the rest of the session, since
-// needsDetail only re-fetches titles whose Genre is still `null`. One
-// retry after a brief pause is enough in practice: FETCH_CONCURRENCY
-// trips OMDb's short burst window, not the hard daily quota, so the
-// window has almost always cleared by the time the retry fires.
-const RATE_LIMIT_RETRY_DELAY_MS = 600;
-
-function isRateLimitedResponse(data) {
-  if (!data || data.Response !== "False") return false;
-  return (data.Error || "").toLowerCase().includes("limit");
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const FETCH_CONCURRENCY = 5;
 
 async function fetchJsonPool(urls, limit = FETCH_CONCURRENCY) {
   const results = new Array(urls.length);
   let next = 0;
 
-  async function fetchOnce(url) {
-    // Every URL passed through this pool in this file is an OMDb
-    // request — count it against the daily quota budget (see
-    // trackOmdbRequest below) right alongside the other single-fetch
-    // call sites, so the counter reflects every request regardless of
-    // which code path made it.
-    trackOmdbRequest();
-    const res = await fetch(url);
-    return res.json();
-  }
-
   async function worker() {
     while (next < urls.length) {
       const i = next++;
       try {
-        let data = await fetchOnce(urls[i]);
-        if (isRateLimitedResponse(data)) {
-          // Short-burst rate limit, not "no results" — give it one
-          // retry after a brief pause instead of writing this title off
-          // for the rest of the session.
-          await sleep(RATE_LIMIT_RETRY_DELAY_MS);
-          data = await fetchOnce(urls[i]);
-        }
-        results[i] = data;
+        // Every URL passed through this pool in this file is an OMDb
+        // request — count it against the daily quota budget (see
+        // trackOmdbRequest below) right alongside the other single-fetch
+        // call sites, so the counter reflects every request regardless
+        // of which code path made it.
+        trackOmdbRequest();
+        const res = await fetch(urls[i]);
+        results[i] = await res.json();
       } catch {
         results[i] = null;
       }
@@ -921,6 +880,13 @@ const BECAUSE_YOU_WATCHED_ROW_SIZE = 12;
 // better to just skip that seed title and try the next one.
 const MIN_BECAUSE_YOU_WATCHED_ROW_SIZE = 5;
 
+// How much a liked title's genre-overlap score gets bumped in the
+// personalized rows below ("Because You Watched" and "You Might Also
+// Like"/"More Like This") — enough to reliably outrank an
+// equally-genre-matched title that hasn't been rated, without letting a
+// single like completely override a much stronger genre/director match.
+const LIKE_SCORE_BONUS = 1;
+
 // --- Auto-load cap (genre-filtered browsing AND text search) ---
 // Applies the same ceiling everywhere scrolling can trigger more OMDb
 // requests on its own: a genre-filtered browse view (any genre — OMDb's
@@ -983,6 +949,7 @@ export default function MovieSearch() {
   const { activeProfile } = useProfiles();
   const { continueWatching, recordWatch, removeFromHistory } = useWatchHistory();
   const { myList, isInList, toggleInList } = useMyList();
+  const { getRating, toggleLike, toggleDislike, likedIds, dislikedIds } = useRatings();
   const kidsMode = !!(activeProfile && activeProfile.isKids);
 
   const [query, setQuery] = useState("");
@@ -1551,6 +1518,12 @@ export default function MovieSearch() {
   // browse page a Netflix-style ranked row using data that's already on
   // hand. Recomputes automatically as more of the browse pool streams in.
   //
+  // Disliked titles are excluded outright (thumbs-down is a stronger,
+  // explicit signal than "just don't happen to match your history" — no
+  // point surfacing something you already said you don't want) —
+  // dislikedIds comes from RatingsContext, the same per-profile localStorage
+  // rating record backing the thumbs buttons on every card.
+  //
   // similarPool is a single list fetched once for the whole app (see the
   // effect above), built from general-audience titles (Star Wars, The
   // Matrix, Gladiator, ...) — it was never curated with a Kids profile in
@@ -1570,20 +1543,25 @@ export default function MovieSearch() {
     pool.forEach((m) => {
       if (!m || !m.imdbID || candidates.has(m.imdbID)) return;
       if (kidsMode && !isKidSafe(m)) return;
+      if (dislikedIds.has(m.imdbID)) return;
       candidates.set(m.imdbID, m);
     });
     return Array.from(candidates.values())
       .sort((a, b) => (b.imdbRating ?? -1) - (a.imdbRating ?? -1))
       .slice(0, 10);
-  }, [browseMovies, similarPool, kidsMode]);
+  }, [browseMovies, similarPool, kidsMode, dislikedIds]);
 
   // --- Derived: "Because You Watched" personalized rows ---
   // Builds one recommendation shelf per recently-opened Continue Watching
   // title (most recent first), the same way Netflix's homepage does.
   // Scoring reuses the exact approach the "More Like This"/"You Might
   // Also Like" panel already uses for a single title (shared-genre count,
-  // highest IMDb rating as the tiebreaker) — just run once per seed
-  // instead of once for whatever's open in the trailer/info panel.
+  // highest IMDb rating as the tiebreaker, now also a small LIKE_SCORE_BONUS
+  // for a title this profile has already given a thumbs-up — see the
+  // comment on LIKE_SCORE_BONUS above) — just run once per seed instead
+  // of once for whatever's open in the trailer/info panel. Disliked
+  // titles never enter the candidate pool at all, same as topTrending
+  // above.
   //
   // Titles already in Continue Watching are excluded from every row (no
   // point recommending something the visitor already opened), and a
@@ -1602,6 +1580,7 @@ export default function MovieSearch() {
     source.forEach((m) => {
       if (!m || !m.imdbID || !m.Genre || pool.has(m.imdbID)) return;
       if (kidsMode && !isKidSafe(m)) return;
+      if (dislikedIds.has(m.imdbID)) return;
       pool.set(m.imdbID, m);
     });
 
@@ -1626,7 +1605,8 @@ export default function MovieSearch() {
         const genres = m.Genre.split(",").map((g) => g.trim()).filter(Boolean);
         const shared = genres.filter((g) => targetGenres.has(g)).length;
         if (shared === 0) return;
-        scored.push({ movie: m, score: shared });
+        const likeBonus = likedIds.has(m.imdbID) ? LIKE_SCORE_BONUS : 0;
+        scored.push({ movie: m, score: shared + likeBonus });
       });
       scored.sort(
         (a, b) => b.score - a.score || (b.movie.imdbRating ?? -1) - (a.movie.imdbRating ?? -1)
@@ -1640,7 +1620,7 @@ export default function MovieSearch() {
     });
 
     return rows;
-  }, [continueWatching, browseMovies, similarPool, movies, kidsMode]);
+  }, [continueWatching, browseMovies, similarPool, movies, kidsMode, dislikedIds, likedIds]);
 
   // --- Derived: genre-based browse rows ---
   // Groups the curated browse pool by genre into Netflix-style shelves.
@@ -1652,7 +1632,19 @@ export default function MovieSearch() {
   // and even after that filter, only the top MAX_GENRE_ROWS survive —
   // GENRE_ROW_ORDER's priority list decides which qualifying genres get
   // the available slots, with anything else alphabetized after.
-  const genreRows = useMemo(() => {
+  //
+  // A movie almost always carries more than one genre tag, so without
+  // deduping here the same title would headline its Action shelf AND its
+  // Comedy shelf AND so on — more posters/DOM nodes to paint for every
+  // scroll past the rows, with zero new content to show for it. Each
+  // title is now claimed by at most one shelf: genres are walked in
+  // priority order and a title already used by an earlier (higher
+  // priority) shelf is skipped when filling a later one. `usedIds` is
+  // returned alongside the rows so the "everything else" section below
+  // (leftoverMovies) knows exactly which titles already appeared in a
+  // shelf and can list every remaining title exactly once instead of
+  // dropping it silently.
+  const genreRowsData = useMemo(() => {
     const pool = kidsMode ? browseMovies.filter(isKidSafe) : browseMovies;
     const minSize = kidsMode ? MIN_ROW_SIZE_KIDS : MIN_ROW_SIZE;
 
@@ -1675,24 +1667,43 @@ export default function MovieSearch() {
         .sort(),
     ];
 
-    return orderedGenres
-      .map((genre) => ({
-        // Shuffled rather than left in fetch order — otherwise a row
-        // always shows the exact same leading titles every time the page
-        // loads (whichever browse-pool entries happened to be found
-        // first), which is what made a couple of title-text-heavy
-        // searches like "man" (Iron Man/Spider-Man/Ant-Man) look like
-        // they were the row's whole contents.
-        genre,
-        movies: shuffleArray(byGenre.get(genre)).slice(0, ROW_ITEM_CAP),
-      }))
-      .filter((row) => row.movies.length >= minSize)
-      // Cap AFTER filtering for fullness, not before — a genre that's
-      // merely early in GENRE_ROW_ORDER but too thin right now shouldn't
-      // burn one of the limited slots ahead of a well-stocked genre that
-      // happens to sort later.
-      .slice(0, MAX_GENRE_ROWS);
+    const usedIds = new Set();
+    const rows = [];
+    for (const genre of orderedGenres) {
+      if (rows.length >= MAX_GENRE_ROWS) break;
+
+      // Shuffled rather than left in fetch order — otherwise a row
+      // always shows the exact same leading titles every time the page
+      // loads (whichever browse-pool entries happened to be found
+      // first) — then filtered down to titles no earlier shelf has
+      // already claimed.
+      const available = shuffleArray(byGenre.get(genre)).filter(
+        (m) => !usedIds.has(m.imdbID)
+      );
+      if (available.length < minSize) continue; // too thin once already-shown titles are excluded
+
+      const picked = available.slice(0, ROW_ITEM_CAP);
+      picked.forEach((m) => usedIds.add(m.imdbID));
+      rows.push({ genre, movies: picked });
+    }
+
+    return { rows, usedIds };
   }, [browseMovies, kidsMode]);
+  const genreRows = genreRowsData.rows;
+
+  // --- Derived: everything not already shown in a genre shelf above ---
+  // The trailing catch-all grid: every browse-pool title that didn't end
+  // up in one of genreRows' shelves, either because it has no genre tag
+  // at all, its genres didn't make the cut, or every shelf it could have
+  // gone in was already full/claimed by another title. Keeps the promise
+  // that nothing loaded ever quietly disappears once genre rows are
+  // showing — it just surfaces lower on the page instead of up top.
+  // Recomputes automatically as more of the browse pool streams in via
+  // "Load more"/infinite scroll, same as genreRowsData above.
+  const leftoverMovies = useMemo(() => {
+    const pool = kidsMode ? browseMovies.filter(isKidSafe) : browseMovies;
+    return pool.filter((m) => !genreRowsData.usedIds.has(m.imdbID));
+  }, [browseMovies, kidsMode, genreRowsData]);
 
   // Rows only replace the flat grid on the plain browse view — once a
   // visitor has picked a type/genre/year filter or an explicit sort
@@ -2321,6 +2332,7 @@ export default function MovieSearch() {
     similarSource.forEach((m) => {
       if (m.imdbID && m.Genre && !candidates.has(m.imdbID)) {
         if (kidsMode && !isKidSafe(m)) return;
+        if (dislikedIds.has(m.imdbID)) return;
         candidates.set(m.imdbID, m);
       }
     });
@@ -2332,7 +2344,8 @@ export default function MovieSearch() {
       const shared = genres.filter((g) => targetGenres.has(g)).length;
       if (shared === 0) return;
       const directorBonus = targetDirector && m.Director === targetDirector ? 1 : 0;
-      scored.push({ movie: m, score: shared + directorBonus });
+      const likeBonus = likedIds.has(m.imdbID) ? LIKE_SCORE_BONUS : 0;
+      scored.push({ movie: m, score: shared + directorBonus + likeBonus });
     });
 
     scored.sort(
@@ -2340,7 +2353,7 @@ export default function MovieSearch() {
     );
 
     return scored.slice(0, 10).map((s) => s.movie);
-  }, [movieDetail, browseMovies, similarPool, movies, kidsMode]);
+  }, [movieDetail, browseMovies, similarPool, movies, kidsMode, dislikedIds, likedIds]);
 
 
   const personTitles = useMemo(() => {
@@ -2658,6 +2671,9 @@ export default function MovieSearch() {
           onMoreInfo={() => openInfo(featuredMovie)}
           isInList={isInList(featuredMovie.imdbID)}
           onToggleList={() => toggleInList(featuredMovie)}
+          myRating={getRating(featuredMovie.imdbID)}
+          onLike={() => toggleLike(featuredMovie)}
+          onDislike={() => toggleDislike(featuredMovie)}
         />
       )}
 
@@ -2686,6 +2702,9 @@ export default function MovieSearch() {
           onSeasonChange={handleSeasonChange}
           isInList={isInList(infoMovie.imdbID)}
           onToggleList={() => toggleInList(infoMovie)}
+          myRating={getRating(infoMovie.imdbID)}
+          onLike={() => toggleLike(infoMovie)}
+          onDislike={() => toggleDislike(infoMovie)}
         />
       )}
 
@@ -2984,6 +3003,9 @@ export default function MovieSearch() {
                 resolveTrailerId={resolveTrailerId}
                 isInList={isInList(movie.imdbID)}
                 onToggleList={toggleInList}
+                myRating={getRating(movie.imdbID)}
+                onLike={toggleLike}
+                onDislike={toggleDislike}
               />
             ))}
           </div>
@@ -3004,6 +3026,9 @@ export default function MovieSearch() {
                 resolveTrailerId={resolveTrailerId}
                 isInList={isInList(movie.imdbID)}
                 onToggleList={toggleInList}
+                myRating={getRating(movie.imdbID)}
+                onLike={toggleLike}
+                onDislike={toggleDislike}
               />
             ))}
           </div>
@@ -3025,6 +3050,9 @@ export default function MovieSearch() {
                   resolveTrailerId={resolveTrailerId}
                   isInList={isInList(movie.imdbID)}
                   onToggleList={toggleInList}
+                  myRating={getRating(movie.imdbID)}
+                  onLike={toggleLike}
+                  onDislike={toggleDislike}
                 />
               ))}
             </div>
@@ -3103,11 +3131,44 @@ export default function MovieSearch() {
                   resolveTrailerId={resolveTrailerId}
                   isInList={isInList(movie.imdbID)}
                   onToggleList={toggleInList}
+                  myRating={getRating(movie.imdbID)}
+                  onLike={toggleLike}
+                  onDislike={toggleDislike}
                 />
               ))}
             </div>
           </div>
         ))}
+
+      {/* Everything that didn't make it into a genre shelf above (see
+          leftoverMovies) — every browse title still shows up somewhere on
+          the page exactly once, it just lands here, below the last
+          category, instead of being dropped or duplicated across rows. */}
+      {!searched && !activeLoading && showRows && leftoverMovies.length > 0 && (
+        <div className="movie-search__row-section">
+          <h2 className="movie-search__section-title">
+            {kidsMode ? "More Kids' Picks" : "More Movies"}
+          </h2>
+          <div className="movie-search__grid">
+            {leftoverMovies.map((movie) => (
+              <MovieCard
+                key={movie.imdbID}
+                movie={movie}
+                variant="grid"
+                isFeatured={!selectedMovie && featuredMovie?.imdbID === movie.imdbID}
+                onSelect={previewMovie}
+                onPlay={openMovie}
+                resolveTrailerId={resolveTrailerId}
+                isInList={isInList(movie.imdbID)}
+                onToggleList={toggleInList}
+                myRating={getRating(movie.imdbID)}
+                onLike={toggleLike}
+                onDislike={toggleDislike}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {!searched && !activeLoading && !showRows && (
         <h2 className="movie-search__section-title">
@@ -3159,6 +3220,9 @@ export default function MovieSearch() {
               resolveTrailerId={resolveTrailerId}
               isInList={isInList(movie.imdbID)}
               onToggleList={toggleInList}
+              myRating={getRating(movie.imdbID)}
+              onLike={toggleLike}
+              onDislike={toggleDislike}
             />
           ))}
         </div>

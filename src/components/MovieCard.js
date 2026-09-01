@@ -33,6 +33,13 @@ function supportsHoverPreview() {
  * `onToggleList`, a small "+"/"✓" My List toggle renders next to the
  * hover Play button. Callers that don't care about My List (none today,
  * but kept optional rather than required) can simply omit both props.
+ *
+ * `myRating` + `onLike`/`onDislike` are optional in the same way: a pair
+ * of thumbs buttons render next to the My List toggle when either
+ * handler is passed. `myRating` is this profile's own opinion of the
+ * title — `'like'`, `'dislike'`, or `null` — never to be confused with
+ * `movie.imdbRating` (OMDb's public rating, shown separately as the gold
+ * badge in the corner of the poster).
  */
 export default function MovieCard({
   movie,
@@ -45,6 +52,9 @@ export default function MovieCard({
   resolveTrailerId,
   isInList = false,
   onToggleList,
+  myRating = null,
+  onLike,
+  onDislike,
 }) {
   const [previewState, setPreviewState] = useState('idle'); // idle | loading | ready | none
   const [previewId, setPreviewId] = useState(null);
@@ -218,6 +228,48 @@ export default function MovieCard({
                 title={isInList ? 'Remove from My List' : 'Add to My List'}
               >
                 <span aria-hidden="true">{isInList ? '✓' : '+'}</span>
+              </button>
+            )}
+            {onLike && (
+              <button
+                type="button"
+                className={`movie-card__rate-toggle movie-card__rate-toggle--like ${
+                  myRating === 'like' ? 'is-active' : ''
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLike(movie);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+                }}
+                aria-pressed={myRating === 'like'}
+                aria-label={myRating === 'like' ? `Remove your like from ${movie.Title}` : `Like ${movie.Title}`}
+                title={myRating === 'like' ? 'Remove like' : 'Like this title'}
+              >
+                <span aria-hidden="true">👍</span>
+              </button>
+            )}
+            {onDislike && (
+              <button
+                type="button"
+                className={`movie-card__rate-toggle movie-card__rate-toggle--dislike ${
+                  myRating === 'dislike' ? 'is-active' : ''
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDislike(movie);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+                }}
+                aria-pressed={myRating === 'dislike'}
+                aria-label={
+                  myRating === 'dislike' ? `Remove your dislike from ${movie.Title}` : `Dislike ${movie.Title}`
+                }
+                title={myRating === 'dislike' ? 'Remove dislike' : 'Dislike this title'}
+              >
+                <span aria-hidden="true">👎</span>
               </button>
             )}
           </div>

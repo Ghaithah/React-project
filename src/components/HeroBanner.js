@@ -92,8 +92,24 @@ function summarizeMinimal(text) {
  * `isInList` + `onToggleList` back a third "My List" action alongside
  * Play / More Info — optional, same as MovieCard's list toggle, so a
  * caller that hasn't wired up My List can simply omit them.
+ *
+ * `myRating` + `onLike`/`onDislike` are optional in the same way: a
+ * compact pair of thumbs icons render alongside the action buttons when
+ * either handler is passed. `myRating` is this profile's own opinion —
+ * `'like'`, `'dislike'`, or `null` — distinct from `movie.imdbRating`
+ * (OMDb's public score, shown in the meta row above).
  */
-function HeroBanner({ movie, onPlay, onMoreInfo, isDefaultFeatured = false, isInList = false, onToggleList }) {
+function HeroBanner({
+  movie,
+  onPlay,
+  onMoreInfo,
+  isDefaultFeatured = false,
+  isInList = false,
+  onToggleList,
+  myRating = null,
+  onLike,
+  onDislike,
+}) {
   const hasPoster = !!movie.Poster && movie.Poster !== 'N/A';
 
   const genres = useMemo(
@@ -206,6 +222,40 @@ function HeroBanner({ movie, onPlay, onMoreInfo, isDefaultFeatured = false, isIn
               <span aria-hidden="true">{isInList ? '✓' : '+'}</span>{' '}
               {isInList ? 'In My List' : 'My List'}
             </button>
+          )}
+          {(onLike || onDislike) && (
+            <div className="hero-banner__rate-group" role="group" aria-label="Rate this title">
+              {onLike && (
+                <button
+                  type="button"
+                  className={`hero-banner__rate-btn hero-banner__rate-btn--like ${
+                    myRating === 'like' ? 'is-active' : ''
+                  }`}
+                  onClick={onLike}
+                  aria-pressed={myRating === 'like'}
+                  aria-label={myRating === 'like' ? `Remove your like from ${movie.Title}` : `Like ${movie.Title}`}
+                  title={myRating === 'like' ? 'Remove like' : 'Like this title'}
+                >
+                  <span aria-hidden="true">👍</span>
+                </button>
+              )}
+              {onDislike && (
+                <button
+                  type="button"
+                  className={`hero-banner__rate-btn hero-banner__rate-btn--dislike ${
+                    myRating === 'dislike' ? 'is-active' : ''
+                  }`}
+                  onClick={onDislike}
+                  aria-pressed={myRating === 'dislike'}
+                  aria-label={
+                    myRating === 'dislike' ? `Remove your dislike from ${movie.Title}` : `Dislike ${movie.Title}`
+                  }
+                  title={myRating === 'dislike' ? 'Remove dislike' : 'Dislike this title'}
+                >
+                  <span aria-hidden="true">👎</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

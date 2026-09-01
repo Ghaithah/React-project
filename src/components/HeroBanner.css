@@ -162,6 +162,7 @@
 .hero-banner__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
 }
 
@@ -214,6 +215,63 @@
   border-color: #e8b04b;
 }
 
+/* --- Thumbs up/down ---
+   A compact icon-only pair, kept visually separate from the pill-shaped
+   Play/More Info/My List buttons above rather than styled as a fourth
+   pill — this is meant to read as a quick rating control (Netflix's own
+   title-page thumbs sit the same way: small, icon-only, off to the
+   side), not another primary action competing for attention. Grayscale +
+   reduced opacity by default so it stays quiet until you've actually
+   rated something; a rated thumb drops the grayscale and tints toward
+   its own color so "you liked this" or "you disliked this" reads at a
+   glance without needing to look for an outline. */
+.hero-banner__rate-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-banner__rate-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.75;
+  transition: filter 0.15s ease, opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.hero-banner__rate-btn:hover,
+.hero-banner__rate-btn:focus-visible {
+  filter: grayscale(0.4);
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.55);
+  transform: translateY(-1px);
+}
+
+.hero-banner__rate-btn.is-active {
+  filter: grayscale(0);
+  opacity: 1;
+}
+
+.hero-banner__rate-btn--like.is-active {
+  border-color: #4caf7d;
+  background: rgba(76, 175, 125, 0.18);
+}
+
+.hero-banner__rate-btn--dislike.is-active {
+  border-color: #e2645a;
+  background: rgba(226, 100, 90, 0.18);
+}
+
 .hero-banner__poster {
   /* fixed-width flex item, not absolutely positioned — its width is
      reserved space the text column's flex-basis/min-width above already
@@ -245,7 +303,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-banner__btn {
+  .hero-banner__btn,
+  .hero-banner__rate-btn {
     transition: none;
   }
 }

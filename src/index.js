@@ -8,6 +8,7 @@ import { AuthProvider } from './components/AuthContext';
 import { ProfileProvider } from './components/ProfileContext';
 import { WatchHistoryProvider } from './components/WatchHistoryContext';
 import { MyListProvider } from './components/MyListContext';
+import { RatingsProvider } from './components/RatingsContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
@@ -27,7 +28,13 @@ root.render(
               beside it purely so the two per-profile-storage providers
               read top-to-bottom as one group. */}
           <MyListProvider>
-            <App />
+            {/* Thumbs up/down (RatingsContext) is the same shape again —
+                per-profile localStorage, read unconditionally by
+                MovieSearch/MovieCard/HeroBanner/MovieInfoModal — so it
+                joins the same group of providers. */}
+            <RatingsProvider>
+              <App />
+            </RatingsProvider>
           </MyListProvider>
         </WatchHistoryProvider>
       </ProfileProvider>
