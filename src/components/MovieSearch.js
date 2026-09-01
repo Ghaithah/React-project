@@ -164,6 +164,71 @@ const SIMILAR_POOL_IDS = [
   "tt1049413", // Up
 ];
 
+// --- Curated trailer IDs (no live YouTube search needed) ---
+// A hand-verified imdbID -> YouTube video ID mapping covering exactly
+// the SIMILAR_POOL_IDS set above — the same ~38 well-known titles that
+// get fetched on every single session (as the general "You Might Also
+// Like"/similar-titles pool) no matter what a visitor actually searches
+// for. Since that set never changes, there's no reason to keep spending
+// part of the very limited YouTube search.list daily quota (100
+// requests/day on this project — see the throttle/budget section
+// further down) re-discovering the same 38 trailers over and over.
+// Each entry here was looked up once and verified two ways before being
+// hardcoded: the title text returned by YouTube's public oembed
+// endpoint (oembed calls don't count against the Data API quota) was
+// checked against the actual movie, and the same call confirms the
+// video is embeddable at all — a handful of otherwise-correct-looking
+// candidates during that process turned out to have embedding disabled
+// (oembed 403) or, in a couple of cases, to be reuploads from an
+// unrelated channel despite an official-sounding title, and were
+// swapped out for a verified alternative instead of used as-is.
+// resolveTrailerId below checks this map before ever touching the
+// persistent cache or the network, so these 38 titles cost zero quota,
+// forever, however often they're hovered or opened. If OMDb's catalog
+// ever points a different imdbID at one of these titles, this map
+// simply won't have an entry for it and resolution falls through to the
+// normal cache/search path unaffected.
+const CURATED_TRAILER_IDS = {
+  tt0109830: "bLvqoHBptjg", // Forrest Gump
+  tt0068646: "UaVTIH8mujA", // The Godfather
+  tt0071562: "tF_v4ZZkQWE", // The Godfather Part II
+  tt0133093: "nUEQNVV3Gfs", // The Matrix
+  tt0099685: "y73Fa_bC6yo", // Goodfellas
+  tt0114369: "KPOuJGkpblk", // Se7en
+  tt0102926: "6iB21hsprAQ", // The Silence of the Lambs
+  tt0120737: "_nZdmwHrcnw", // The Fellowship of the Ring
+  tt0245429: "rwY4XwAyrM4", // Spirited Away
+  tt0110357: "eHcZlPpNt0Q", // The Lion King (1994)
+  tt2582802: "WfBmoQaHzfQ", // Whiplash
+  tt0361748: "wDI2kqJxasU", // Inglourious Basterds
+  tt0993846: "iszwuX1AK6A", // The Wolf of Wall Street
+  tt0119217: "ReIJ1lbL-Q8", // Good Will Hunting
+  tt0407887: "r-MiSNsCdQ4", // The Departed
+  tt0338013: "07-QBnEkgXU", // Eternal Sunshine of the Spotless Mind
+  tt0088763: "WRrCVyT09ow", // Back to the Future
+  tt0209144: "4CV41hoyS8A", // Memento
+  tt0172495: "uvbavW31adA", // Gladiator
+  tt0081505: "FZQvIJxG9Xs", // The Shining
+  tt0078748: "OjfRhwn-4fw", // Alien
+  tt0107048: "TYscEUt17oE", // Groundhog Day
+  tt0120815: "9CiW_DgxCnQ", // Saving Private Ryan
+  tt0475784: "JctIuZfSsa4", // Westworld — this imdbID is HBO's 2016 TV series, not the 1973 film
+  tt0076759: "L-_xHEv0l-w", // Star Wars: A New Hope
+  tt0080684: "5TJuVT-q6yk", // The Empire Strikes Back
+  tt0086190: "q118J_LLEx0", // Return of the Jedi
+  tt0107290: "_jKEqDKpJLw", // Jurassic Park
+  tt0114814: "Ij4Fdq190qo", // The Usual Suspects
+  tt0180093: "s0_w_KB0U80", // Requiem for a Dream
+  tt0264464: "SosRcIMCr5g", // Catch Me If You Can
+  tt2015381: "2XltzyLcu0g", // Guardians of the Galaxy
+  tt0117951: "8LuxOYIpu-I", // Trainspotting
+  tt7286456: "SaVxhiWI0Rc", // Joker
+  tt1130884: "gN02XJ9pDAU", // Shutter Island
+  tt2380307: "xlnPHQ3TLX8", // Coco
+  tt0435761: "2BlMNH1QTeE", // Toy Story 3
+  tt1049413: "ORFWdXl_zJ4", // Up
+};
+
 // Caps how many OMDb requests fire at once. Fetching a whole ID batch with
 // a bare Promise.all() (as this used to) throws every request at OMDb
 // simultaneously — up to 49 at once between the browse grid and the
@@ -174,24 +239,66 @@ const SIMILAR_POOL_IDS = [
 // vanish from the grid with zero indication anything went wrong. Routing
 // every OMDb fetch through this small worker pool keeps at most
 // FETCH_CONCURRENCY requests in flight at a time.
-const FETCH_CONCURRENCY = 5;
+//
+// Raised from 5 to 8: with only 5 in flight, a batch needing detail
+// lookups for 10+ titles (a full browse page, or the similar-titles
+// pool) took two or three fully-sequential rounds — each individually
+// fast (~350-450ms) — to finish enriching, and that sequential stacking
+// was what pushed the page's visible "settle" time up near 2s even
+// though no single request was actually slow. 8 clears a same-size
+// batch in one or two rounds instead. This does raise the odds of
+// occasionally tripping OMDb's short-burst rate limiter, so the retry
+// below absorbs that instead of silently giving up on the title.
+const FETCH_CONCURRENCY = 8;
+
+// How long to pause before re-trying a single request that came back
+// rate-limited. Without this, a rate-limited response would be treated
+// exactly like a genuine "nothing found" by the caller (mergeDetailIntoMovie
+// sets Genre: "" when no matching detail comes back) — permanently
+// blanking that title's genre/rating for the rest of the session, since
+// needsDetail only re-fetches titles whose Genre is still `null`. One
+// retry after a brief pause is enough in practice: FETCH_CONCURRENCY
+// trips OMDb's short burst window, not the hard daily quota, so the
+// window has almost always cleared by the time the retry fires.
+const RATE_LIMIT_RETRY_DELAY_MS = 600;
+
+function isRateLimitedResponse(data) {
+  if (!data || data.Response !== "False") return false;
+  return (data.Error || "").toLowerCase().includes("limit");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function fetchJsonPool(urls, limit = FETCH_CONCURRENCY) {
   const results = new Array(urls.length);
   let next = 0;
 
+  async function fetchOnce(url) {
+    // Every URL passed through this pool in this file is an OMDb
+    // request — count it against the daily quota budget (see
+    // trackOmdbRequest below) right alongside the other single-fetch
+    // call sites, so the counter reflects every request regardless of
+    // which code path made it.
+    trackOmdbRequest();
+    const res = await fetch(url);
+    return res.json();
+  }
+
   async function worker() {
     while (next < urls.length) {
       const i = next++;
       try {
-        // Every URL passed through this pool in this file is an OMDb
-        // request — count it against the daily quota budget (see
-        // trackOmdbRequest below) right alongside the other single-fetch
-        // call sites, so the counter reflects every request regardless
-        // of which code path made it.
-        trackOmdbRequest();
-        const res = await fetch(urls[i]);
-        results[i] = await res.json();
+        let data = await fetchOnce(urls[i]);
+        if (isRateLimitedResponse(data)) {
+          // Short-burst rate limit, not "no results" — give it one
+          // retry after a brief pause instead of writing this title off
+          // for the rest of the session.
+          await sleep(RATE_LIMIT_RETRY_DELAY_MS);
+          data = await fetchOnce(urls[i]);
+        }
+        results[i] = data;
       } catch {
         results[i] = null;
       }
@@ -1995,6 +2102,15 @@ export default function MovieSearch() {
   // a more specific error if they want to (the main trailer panel does;
   // hover previews just treat it the same as "nothing found").
   const resolveTrailerId = useCallback((movie) => {
+    // Curated titles (see CURATED_TRAILER_IDS above) resolve for free,
+    // every time, with zero cache lookups and zero network — checked
+    // first since it's the cheapest possible path and never goes stale.
+    const curated = CURATED_TRAILER_IDS[movie.imdbID];
+    if (curated !== undefined) {
+      trailerCache.current[movie.imdbID] = curated;
+      return Promise.resolve(curated);
+    }
+
     const cached = trailerCache.current[movie.imdbID];
     if (cached !== undefined) return Promise.resolve(cached);
 
