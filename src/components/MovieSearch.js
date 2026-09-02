@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { useProfiles } from "./ProfileContext";
 import { useWatchHistory } from "./WatchHistoryContext";
 import { useMyList } from "./MyListContext";
@@ -739,6 +739,11 @@ function parseDetailToMovie(detail) {
     Plot: detail.Plot || "",
     Runtime: detail.Runtime || "",
     Rated: detail.Rated || "",
+    // Same reasoning: OMDb's by-ID lookup already returns Language for
+    // free, so it's captured here rather than firing a second request —
+    // it's what powers the "Browse by Languages" filter (see
+    // languageFilter below).
+    Language: detail.Language || "",
     imdbRating:
       detail.imdbRating && detail.imdbRating !== "N/A"
         ? parseFloat(detail.imdbRating)
@@ -762,6 +767,7 @@ function mergeDetailIntoMovie(movie, detail) {
     Plot: detail.Plot || "",
     Runtime: detail.Runtime || "",
     Rated: detail.Rated || "",
+    Language: detail.Language || "",
     imdbRating: detail.imdbRating && detail.imdbRating !== "N/A" ? parseFloat(detail.imdbRating) : null,
   };
 }
@@ -1014,6 +1020,13 @@ export default function MovieSearch() {
   const [showFilters, setShowFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState("");
   const [genreFilter, setGenreFilter] = useState("");
+  // Filters the active list down to titles whose OMDb "Language" field
+  // includes the chosen language — the same shape of filter as
+  // genreFilter above, just against a different field. Driven either by
+  // the Filters panel's own dropdown, or by picking a tile on the
+  // dedicated Browse by Languages page (see the ?language= URL handoff
+  // effect below, which mirrors the existing ?genre= one).
+  const [languageFilter, setLanguageFilter] = useState("");
   const [yearMin, setYearMin] = useState("");
   const [yearMax, setYearMax] = useState("");
   const [sortBy, setSortBy] = useState("relevance");
@@ -1026,6 +1039,7 @@ export default function MovieSearch() {
   const searchInputRef = useRef(null);
 
 
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("movie");
   const [selectedMovie, setSelectedMovie] = useState(null);
@@ -1073,10 +1087,11 @@ export default function MovieSearch() {
   const trailerSectionRef = useRef(null); // scroll target: the trailer panel at the top of the page
   const pendingMovieRef = useRef(null); // movie object from the click that's about to become selectedId
   const loadMoreSentinelRef = useRef(null); // bottom-of-grid marker watched for infinite scroll
-  // Guards the one-time "?genre=" URL param handoff from the Genres page
-  // (see the effect right below) so it only ever applies once per page
-  // load — after that, the Filters panel's own Genre dropdown is what
-  // drives genreFilter, and this effect must not fight it on re-renders.
+  // Guards the one-time "?genre="/"?language="/"/shows" URL-and-route
+  // handoff (see the effect right below) so it only ever applies once
+  // per page load — after that, the Filters panel's own dropdowns are
+  // what drive genreFilter/typeFilter/languageFilter, and this effect
+  // must not fight them on re-renders.
   const appliedGenreParamRef = useRef(false);
 
 
@@ -1106,24 +1121,70 @@ export default function MovieSearch() {
   }, [kidsMode]);
 
 
-  // One-time handoff from the Genres browse page: a tile there links to
-  // `/movies?genre=<name>` so picking a genre from a dedicated grid of
-  // tiles (rather than only the Filters panel's dropdown, which you'd
-  // otherwise have to already be on this page and open Filters to find)
-  // lands here with that genre pre-applied and the Filters panel already
-  // open, showing the flat filtered grid immediately. Runs once on mount
-  // only — afterwards the Genre dropdown in the Filters panel owns
-  // genreFilter, same as if the visitor had picked it there themselves.
+  // One-time handoff into the Filters panel from a URL param, so picking
+  // something from a tile grid (rather than only the Filters panel's own
+  // dropdowns, which you'd otherwise have to already be on this page and
+  // open Filters to find) lands here with the right filter pre-applied
+  // and the Filters panel already open:
+  //   - `/movies?genre=<name>` (a tile on the Genres page) pre-applies
+  //     that genre.
+  //   - `/movies?language=<name>` (a tile on the Browse by Languages
+  //     page) pre-applies that language.
+  // Runs once on mount only — afterwards the Filters panel's dropdowns
+  // own genreFilter/languageFilter, same as if the visitor had picked
+  // them there themselves. (typeFilter/Home-Shows-Movies is handled by
+  // the route-driven effect right below instead, since it has to keep
+  // reacting every time the visitor switches tabs, not just once.)
   useEffect(() => {
     if (appliedGenreParamRef.current) return;
     appliedGenreParamRef.current = true;
+
+    let opened = false;
+
     const g = searchParams.get("genre");
     if (g) {
       setGenreFilter(g);
-      setShowFilters(true);
+      opened = true;
     }
+
+    const lang = searchParams.get("language");
+    if (lang) {
+      setLanguageFilter(lang);
+      opened = true;
+    }
+
+    if (opened) setShowFilters(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keeps typeFilter in sync with the Header's Home / Shows / Movies tabs
+  // on EVERY navigation, not just the first time this component mounts.
+  // React Router doesn't remount MovieSearch when navigating between
+  // "/", "/shows" and "/movies" — they all render the exact same element
+  // tree, so from React's perspective it's the same component instance
+  // staying mounted across the URL change. A mount-only effect (like the
+  // one above) would therefore only ever apply once per page load; this
+  // effect instead re-derives typeFilter from the current route every
+  // time location.pathname (or the "/movies?type=" query) changes, which
+  // is what makes clicking Shows after Movies (or back again) actually
+  // take effect each time:
+  //   - `/shows` -> only Series
+  //   - `/movies?type=movie` (the Header's "Movies" tab) -> only Movies
+  //   - `/movies` with no `type` param (e.g. a Genres tile's
+  //     `/movies?genre=<name>` link) -> both, same as before these tabs
+  //     existed, so genre browsing isn't silently narrowed to one type
+  //   - `/` (Home) -> both
+  // Anywhere else, typeFilter is left alone so the Filters panel's own
+  // Type dropdown still works normally.
+  useEffect(() => {
+    if (location.pathname === "/shows") {
+      setTypeFilter("series");
+    } else if (location.pathname === "/movies") {
+      setTypeFilter(searchParams.get("type") === "movie" ? "movie" : "");
+    } else if (location.pathname === "/") {
+      setTypeFilter("");
+    }
+  }, [location.pathname, searchParams]);
 
 
   // Walks forward through the term/year combo space (see
@@ -1464,6 +1525,27 @@ export default function MovieSearch() {
   const activeMovies = searched ? movies : browseMovies;
   const activeLoading = searched ? loading : browseLoading;
 
+  // --- Derived: page-wide type filtering (Home / Shows / Movies tabs) ---
+  // typeFilter (kept in sync with the route by the effect above) has to
+  // apply everywhere on the page, not just the main grid — Continue
+  // Watching, My List, Top 10 Today, Because You Watched, and the hero
+  // banner's default pick all pull from their own unfiltered lists
+  // (continueWatching/myList/browseMovies/similarPool), so each of those
+  // needs its own type-filtered view rather than relying on
+  // filteredMovies below (which only covers the main grid).
+  const visibleContinueWatching = useMemo(
+    () => (typeFilter ? continueWatching.filter((m) => m.Type === typeFilter) : continueWatching),
+    [continueWatching, typeFilter]
+  );
+  const visibleMyList = useMemo(
+    () => (typeFilter ? myList.filter((m) => m.Type === typeFilter) : myList),
+    [myList, typeFilter]
+  );
+  const typeFilteredBrowseMovies = useMemo(
+    () => (typeFilter ? browseMovies.filter((m) => m.Type === typeFilter) : browseMovies),
+    [browseMovies, typeFilter]
+  );
+
   // --- Derived: search suggestions dropdown ---
   // Reuses the flat `movies` list the debounced search effect above
   // already fetches (raw OMDb search-result shape: Title/Year/imdbID/
@@ -1480,8 +1562,11 @@ export default function MovieSearch() {
   // pulled in so the banner has something to show before any click
   // happens. The fallback only applies on the browse view — search
   // results don't get an unrelated hero banner pinned above them unless
-  // the visitor has actually clicked one of them to preview it.
-  const defaultFeaturedMovie = !searched && browseMovies.length > 0 ? browseMovies[0] : null;
+  // the visitor has actually clicked one of them to preview it. Uses the
+  // type-filtered pool so, e.g., the Shows tab never opens on a movie's
+  // hero banner.
+  const defaultFeaturedMovie =
+    !searched && typeFilteredBrowseMovies.length > 0 ? typeFilteredBrowseMovies[0] : null;
   const featuredMovie = heroMovie || defaultFeaturedMovie;
 
   const searchCapped = movies.length >= AUTO_LOAD_TARGET_COUNT;
@@ -1543,13 +1628,18 @@ export default function MovieSearch() {
     pool.forEach((m) => {
       if (!m || !m.imdbID || candidates.has(m.imdbID)) return;
       if (kidsMode && !isKidSafe(m)) return;
+      // Respects the Home/Shows/Movies tab (or a manual Type pick in the
+      // Filters panel) the same way the main grid does — otherwise this
+      // row would keep mixing in the other type even while the rest of
+      // the page is filtered down to just one.
+      if (typeFilter && m.Type !== typeFilter) return;
       if (dislikedIds.has(m.imdbID)) return;
       candidates.set(m.imdbID, m);
     });
     return Array.from(candidates.values())
       .sort((a, b) => (b.imdbRating ?? -1) - (a.imdbRating ?? -1))
       .slice(0, 10);
-  }, [browseMovies, similarPool, kidsMode, dislikedIds]);
+  }, [browseMovies, similarPool, kidsMode, dislikedIds, typeFilter]);
 
   // --- Derived: "Because You Watched" personalized rows ---
   // Builds one recommendation shelf per recently-opened Continue Watching
@@ -1580,6 +1670,10 @@ export default function MovieSearch() {
     source.forEach((m) => {
       if (!m || !m.imdbID || !m.Genre || pool.has(m.imdbID)) return;
       if (kidsMode && !isKidSafe(m)) return;
+      // Same Home/Shows/Movies (or manual Type) filter as topTrending
+      // above — recommendations stay the same type as everything else
+      // on the page instead of quietly mixing the other type back in.
+      if (typeFilter && m.Type !== typeFilter) return;
       if (dislikedIds.has(m.imdbID)) return;
       pool.set(m.imdbID, m);
     });
@@ -1588,8 +1682,12 @@ export default function MovieSearch() {
     const usedIds = new Set();
     const minRowSize = kidsMode ? Math.min(MIN_BECAUSE_YOU_WATCHED_ROW_SIZE, MIN_ROW_SIZE_KIDS) : MIN_BECAUSE_YOU_WATCHED_ROW_SIZE;
 
+    // Seeds (the "Because you watched X" titles themselves) are also
+    // limited to the active type filter — a movie you watched shouldn't
+    // headline a shelf while the Shows tab is filtering everything else
+    // on the page down to series only.
     const seeds = continueWatching
-      .filter((m) => m.Genre)
+      .filter((m) => m.Genre && (!typeFilter || m.Type === typeFilter))
       .slice(0, BECAUSE_YOU_WATCHED_SEED_COUNT);
 
     const rows = [];
@@ -1620,7 +1718,7 @@ export default function MovieSearch() {
     });
 
     return rows;
-  }, [continueWatching, browseMovies, similarPool, movies, kidsMode, dislikedIds, likedIds]);
+  }, [continueWatching, browseMovies, similarPool, movies, kidsMode, dislikedIds, likedIds, typeFilter]);
 
   // --- Derived: genre-based browse rows ---
   // Groups the curated browse pool by genre into Netflix-style shelves.
@@ -1706,19 +1804,32 @@ export default function MovieSearch() {
   }, [browseMovies, kidsMode, genreRowsData]);
 
   // Rows only replace the flat grid on the plain browse view — once a
-  // visitor has picked a type/genre/year filter or an explicit sort
-  // order, each shelf being independently curated (rather than obeying
-  // that choice) would just be confusing, so it falls back to the same
-  // filtered flat grid search results already use.
+  // visitor has picked a type/genre/language/year filter or an explicit
+  // sort order, each shelf being independently curated (rather than
+  // obeying that choice) would just be confusing, so it falls back to
+  // the same filtered flat grid search results already use.
   const filtersActive =
-    !!typeFilter || !!genreFilter || !!yearMin || !!yearMax || sortBy !== "relevance";
+    !!typeFilter || !!genreFilter || !!languageFilter || !!yearMin || !!yearMax || sortBy !== "relevance";
   const showRows = !searched && !filtersActive && genreRows.length > 0;
 
-  // --- Derived: genre options available so far ---
+  // --- Derived: genre/language options available so far ---
   const genreOptions = useMemo(() => {
     const set = new Set();
     activeMovies.forEach((m) => {
       if (m.Genre) m.Genre.split(",").map((g) => g.trim()).forEach((g) => set.add(g));
+    });
+    return ["", ...Array.from(set).sort()];
+  }, [activeMovies]);
+
+  // Same idea as genreOptions above, built from whatever "Language"
+  // values have actually loaded so far (OMDb returns this as a
+  // comma-separated string, e.g. "English, Spanish") — so the dropdown
+  // never offers a language with zero matches in what's currently
+  // fetched.
+  const languageOptions = useMemo(() => {
+    const set = new Set();
+    activeMovies.forEach((m) => {
+      if (m.Language) m.Language.split(",").map((l) => l.trim()).filter(Boolean).forEach((l) => set.add(l));
     });
     return ["", ...Array.from(set).sort()];
   }, [activeMovies]);
@@ -1732,6 +1843,9 @@ export default function MovieSearch() {
     if (typeFilter) list = list.filter((m) => m.Type === typeFilter);
     if (genreFilter) {
       list = list.filter((m) => m.Genre && m.Genre.includes(genreFilter));
+    }
+    if (languageFilter) {
+      list = list.filter((m) => m.Language && m.Language.includes(languageFilter));
     }
     if (yearMin) {
       list = list.filter((m) => {
@@ -1764,14 +1878,15 @@ export default function MovieSearch() {
     }
 
     return list;
-  }, [activeMovies, kidsMode, typeFilter, genreFilter, yearMin, yearMax, sortBy]);
+  }, [activeMovies, kidsMode, typeFilter, genreFilter, languageFilter, yearMin, yearMax, sortBy]);
 
   const activeFilterCount =
-    (typeFilter ? 1 : 0) + (genreFilter ? 1 : 0) + (yearMin ? 1 : 0) + (yearMax ? 1 : 0);
+    (typeFilter ? 1 : 0) + (genreFilter ? 1 : 0) + (languageFilter ? 1 : 0) + (yearMin ? 1 : 0) + (yearMax ? 1 : 0);
 
   function clearFilters() {
     setTypeFilter("");
     setGenreFilter("");
+    setLanguageFilter("");
     setYearMin("");
     setYearMax("");
   }
@@ -2622,6 +2737,15 @@ export default function MovieSearch() {
             </label>
 
             <label className="movie-search__filter-field">
+              <span>Language {enriching && <em className="movie-search__hint">(loading…)</em>}</span>
+              <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)}>
+                {languageOptions.map((l) => (
+                  <option key={l || "all"} value={l}>{l || "All languages"}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="movie-search__filter-field">
               <span>Year from</span>
               <input
                 type="number"
@@ -2986,13 +3110,13 @@ export default function MovieSearch() {
         </div>
       )}
 
-      {!searched && !activeLoading && continueWatching.length > 0 && (
+      {!searched && !activeLoading && visibleContinueWatching.length > 0 && (
         <div className="movie-search__row-section">
           <h2 className="movie-search__section-title">
             Continue Watching{activeProfile ? ` for ${activeProfile.name}` : ""}
           </h2>
           <div className="movie-search__row-track">
-            {continueWatching.map((movie) => (
+            {visibleContinueWatching.map((movie) => (
               <MovieCard
                 key={movie.imdbID}
                 movie={movie}
@@ -3012,11 +3136,11 @@ export default function MovieSearch() {
         </div>
       )}
 
-      {!searched && !activeLoading && myList.length > 0 && (
+      {!searched && !activeLoading && visibleMyList.length > 0 && (
         <div className="movie-search__row-section">
           <h2 className="movie-search__section-title">My List</h2>
           <div className="movie-search__row-track">
-            {myList.map((movie) => (
+            {visibleMyList.map((movie) => (
               <MovieCard
                 key={movie.imdbID}
                 movie={movie}

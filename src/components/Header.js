@@ -1,9 +1,30 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { useProfiles } from './ProfileContext'
 import { ProfileAvatar } from './Avatars'
 import Logo from './Logo'
 import './Header.css'
+
+// Primary top-nav links (Netflix-style pill tabs) shown next to the brand
+// once someone's actually browsing (logged in, profile picked). "Games"
+// deliberately isn't in this list — everything else mirrors the same row
+// of tabs, just without it.
+//
+// Home/Shows/Languages each get their own pathname, so <NavLink>'s
+// default active-matching (pathname only) highlights them correctly with
+// no extra logic here. Movies reuses the pre-existing "/movies" route
+// (also used, unfiltered, by Genre tiles as "/movies?genre=<name>") with
+// a "?type=movie" marker instead of a route of its own — MovieSearch
+// reads that marker to decide whether "/movies" means "just movies" (the
+// tab) or "everything, optionally by genre" (a Genre tile), so this tab
+// still lights up (NavLink ignores the query string when matching) while
+// genre browsing isn't accidentally narrowed to movies only.
+const PRIMARY_NAV_LINKS = [
+  { to: '/', label: 'Home', end: true },
+  { to: '/shows', label: 'Shows' },
+  { to: '/movies?type=movie', label: 'Movies' },
+  { to: '/languages', label: 'Browse by Languages' },
+];
 
 function Header(props) {
   const { user, logout } = useAuth();
@@ -31,20 +52,40 @@ function Header(props) {
   return (
     <nav className="navbar navbar-dark bg-dark app-header">
       <div className="container d-flex justify-content-between align-items-center">
-        <Link
-          to="/"
-          className="navbar-brand app-header__brand mb-0 h1 d-flex align-items-center gap-2"
-          onClick={handleBrandClick}
-          aria-label="Watch & Wonder — back to browse"
-        >
-          <Logo height={48} showWordmark={false} />
-          {/* Wrapped in its own span (rather than left as bare text next
-              to the logo) so the narrowest phone widths can drop just
-              this wordmark via CSS — see the max-width: 480px rule in
-              Header.css — while the Link keeps its aria-label so the
-              brand is still announced correctly with the text hidden. */}
-          <span className="app-header__brand-text">Watch & Wonder</span>
-        </Link>
+        <div className="app-header__left d-flex align-items-center">
+          <Link
+            to="/"
+            className="navbar-brand app-header__brand mb-0 h1 d-flex align-items-center gap-2"
+            onClick={handleBrandClick}
+            aria-label="Watch & Wonder — back to browse"
+          >
+            <Logo height={48} showWordmark={false} />
+            {/* Wrapped in its own span (rather than left as bare text next
+                to the logo) so the narrowest phone widths can drop just
+                this wordmark via CSS — see the max-width: 480px rule in
+                Header.css — while the Link keeps its aria-label so the
+                brand is still announced correctly with the text hidden. */}
+            <span className="app-header__brand-text">Watch & Wonder</span>
+          </Link>
+
+          {user && activeProfile && !isProfilesPage && (
+            <ul className="app-header__primary-nav mb-0">
+              {PRIMARY_NAV_LINKS.map((item) => (
+                <li key={item.to} className="app-header__primary-nav-item">
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      `app-header__primary-link${isActive ? ' is-active' : ''}`
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <ul className="nav align-items-center mb-0">
           {user ? (
