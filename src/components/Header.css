@@ -36,33 +36,57 @@
   text-decoration: none;
 }
 
-/* Groups the brand with the primary tab row (Home/Shows/Movies/Browse by
-   Languages) so the two sit together on the left, Netflix-style, while
-   the account-side list (Genres/My List/avatar/Logout) stays pinned to
-   the right via the container's justify-content-between. */
 .app-header__left {
-  gap: 28px;
   min-width: 0;
 }
 
-/* --- Primary nav (Home / Shows / Movies / Browse by Languages) ---
-   Styled after the pill-tab look of Netflix's own top nav: plain muted
-   text for every tab, and the active one gets a soft translucent pill
-   behind bolder, brighter text — same idea as the "Games" tab in the
-   reference screenshot, just without a Games tab at all. Built with
-   react-router's <NavLink> (see Header.js) so "is-active" reflects the
-   actual current route with no manual matching logic here. */
+/* --- Primary nav row (Home / Shows / Movies / Browse by Languages) ---
+   A second full-width row directly under the main bar (brand + account
+   controls), rather than squeezed inline next to the brand — the two
+   together (brand/tabs on the left, Genres/My List/avatar/Welcome/
+   Logout on the right) don't fit on one line once a phone gets involved,
+   and there is exactly one copy of this markup for every screen size
+   (see the comment in Header.js on why — a duplicated desktop/mobile
+   version of this was tried and both ended up visible at once). Styled
+   after the pill-tab look of Netflix's own top nav: plain muted text for
+   every tab, and the active one gets a soft translucent pill behind
+   bolder, brighter text. Built with react-router's <NavLink> (see
+   Header.js) so "is-active" reflects the actual current route with no
+   manual matching logic here.
+
+   overflow-x: auto is always on, at every width — it's a no-op on a
+   desktop-width screen (all four tabs fit, so there's nothing to
+   scroll), and it's what turns this into a swipeable strip on a phone,
+   where they don't. One rule set instead of a breakpoint that has to
+   flip a duplicate row on and off. */
+.app-header__primary-row {
+  border-top: 1px solid var(--border);
+}
+
 .app-header__primary-nav {
   display: flex;
   align-items: center;
   gap: 4px;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 6px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.app-header__primary-nav::-webkit-scrollbar {
+  height: 5px;
+}
+
+.app-header__primary-nav::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .app-header__primary-nav-item {
-  display: flex;
+  flex: none;
 }
 
 .app-header__primary-link {
@@ -178,29 +202,6 @@
   vertical-align: middle;
 }
 
-/* ---- Medium screens ----
-   The primary nav (Home/Shows/Movies/Browse by Languages) is the widest
-   thing in the bar besides the account-side list, and it's the least
-   essential piece for a cramped viewport — everywhere it links to is
-   still reachable via the brand (Home), the Genres link, or typing a
-   search. Rather than wrap it onto its own row or build a hamburger for
-   it (same reasoning the existing narrow-screen rules below already
-   apply to the rest of this bar), it's dropped first, before anything
-   else in the header starts getting trimmed. */
-@media (max-width: 900px) {
-  .app-header__primary-nav {
-    display: none;
-  }
-
-  /* The greeting has more of the bar to itself once the primary nav is
-     gone, but a very long name can still crowd Genres/My List/avatar/
-     Logout at this width — trimmed a bit further than the 160px default
-     above. */
-  .app-header__welcome {
-    max-width: 120px;
-  }
-}
-
 /* ---- Small screens ----
    Header.js's nav bar is a plain flex row (brand on the left, a
    .nav list of items on the right) with no navbar-collapse/hamburger
@@ -240,6 +241,20 @@
 
   .app-header__profile-avatar {
     margin-right: 4px;
+  }
+
+  .app-header__primary-row {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .app-header__primary-nav {
+    gap: 2px;
+  }
+
+  .app-header__primary-link {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.85rem;
   }
 }
 

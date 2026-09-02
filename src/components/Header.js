@@ -49,6 +49,8 @@ function Header(props) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  const showPrimaryNav = user && activeProfile && !isProfilesPage;
+
   return (
     <nav className="navbar navbar-dark bg-dark app-header">
       <div className="container d-flex justify-content-between align-items-center">
@@ -67,24 +69,6 @@ function Header(props) {
                 brand is still announced correctly with the text hidden. */}
             <span className="app-header__brand-text">Watch & Wonder</span>
           </Link>
-
-          {user && activeProfile && !isProfilesPage && (
-            <ul className="app-header__primary-nav mb-0">
-              {PRIMARY_NAV_LINKS.map((item) => (
-                <li key={item.to} className="app-header__primary-nav-item">
-                  <NavLink
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      `app-header__primary-link${isActive ? ' is-active' : ''}`
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
         <ul className="nav align-items-center mb-0">
@@ -150,6 +134,39 @@ function Header(props) {
           )}
         </ul>
       </div>
+
+      {/* Second row: Home / Shows / Movies / Browse by Languages, always
+          rendered here (not duplicated inline next to the brand for
+          desktop and separately for mobile — that was tried and it
+          rendered both copies at once on wide screens, since the CSS
+          meant to hide one of them didn't reliably apply everywhere it
+          was tested). One single list, styled to just work at any width:
+          it's a plain non-scrolling row when everything fits (typical
+          desktop/tablet widths), and only becomes horizontally
+          scrollable — same fade-edge + thin-scrollbar treatment the
+          movie shelves elsewhere in this app already use — once it
+          genuinely doesn't fit, which in practice is roughly phone
+          width. See .app-header__primary-row/.app-header__primary-nav
+          in Header.css. */}
+      {showPrimaryNav && (
+        <div className="container app-header__primary-row">
+          <ul className="app-header__primary-nav mb-0">
+            {PRIMARY_NAV_LINKS.map((item) => (
+              <li key={item.to} className="app-header__primary-nav-item">
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    `app-header__primary-link${isActive ? ' is-active' : ''}`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </nav>
   );
 }
