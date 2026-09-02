@@ -302,6 +302,39 @@
   }
 }
 
+/* ---- Small phones ----
+   The 720px breakpoint above covers a wide range (tablet down to a
+   320px phone) with one fixed size — fine down to a "normal" phone, but
+   still cramped on the smallest screens: 32px title text plus the full
+   action row (Play/More Info/My List/thumbs, all flex-wrap already) can
+   run the banner tall on a 320-380px-wide phone. This tightens things
+   further specifically for that range rather than adjusting the 720px
+   rule itself, so nothing at tablet width is affected. */
+@media (max-width: 420px) {
+  .hero-banner__row {
+    padding: 40px 16px 28px;
+    min-height: 48vh;
+  }
+
+  .hero-banner__title {
+    font-size: 26px;
+  }
+
+  .hero-banner__synopsis {
+    font-size: 15px;
+  }
+
+  .hero-banner__btn {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+
+  .hero-banner__rate-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-banner__btn,
   .hero-banner__rate-btn {

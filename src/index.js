@@ -1,5 +1,20 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+// Bootstrap's CSS must load BEFORE index.css, not after. Bootstrap's
+// reboot stylesheet sets `body { background-color: #fff; }` — with
+// these two imports in the opposite order (as they were before), that
+// rule loaded AFTER index.css's own `body { background-color: #0d0f14; }`
+// and, being the same specificity, silently won the cascade and painted
+// body white again. That's what was showing as a white flash/gap during
+// the mobile overscroll "bounce" past the top or bottom of the page: it
+// wasn't the bounce rendering itself, it was body's real background
+// actually being white underneath. Importing Bootstrap first means
+// index.css (and everything imported after it) always gets the last
+// word over Bootstrap's own defaults, which is the order every
+// component-level override in this app (Header.css, Footer.css, etc.)
+// already assumes.
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
@@ -9,8 +24,6 @@ import { ProfileProvider } from './components/ProfileContext';
 import { WatchHistoryProvider } from './components/WatchHistoryContext';
 import { MyListProvider } from './components/MyListContext';
 import { RatingsProvider } from './components/RatingsContext';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

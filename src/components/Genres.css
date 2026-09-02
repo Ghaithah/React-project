@@ -64,6 +64,37 @@
   box-shadow: 0 10px 24px rgba(232, 176, 75, 0.18);
 }
 
+/* ---- Small phones ----
+   The page shell's 24px side padding plus the grid's 160px minimum tile
+   width leave too little room on a real phone screen for more than a
+   single column — e.g. at 375px wide, 24px padding on each side plus an
+   18px gap only leaves room for one 160px+ tile, not two, so the tile
+   grid collapsed into a single-column list exactly where a compact grid
+   matters most. Tightening the shell padding and shrinking the minimum
+   tile/gap size here is enough to keep 2 (often 3, on a slightly wider
+   phone) columns down to a 320px-wide screen, without touching the
+   grid's behavior at any wider breakpoint — the minmax() clamp still
+   lets it grow past that on tablets/desktop exactly as before. */
+@media (max-width: 480px) {
+  .genres-page {
+    padding: 28px 14px 60px;
+  }
+
+  .genres-page__title {
+    font-size: 2.1rem;
+  }
+
+  .genres-page__grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 12px;
+  }
+
+  .genres-page__tile {
+    font-size: 1.1rem;
+    padding: 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .genres-page__tile {
     transition: none;

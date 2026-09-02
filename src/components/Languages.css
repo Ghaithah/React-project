@@ -64,6 +64,35 @@
   box-shadow: 0 10px 24px rgba(232, 176, 75, 0.18);
 }
 
+/* ---- Small phones ----
+   Same fix as Genres.css/MovieSearch.css/MyListPage.css: the page
+   shell's 24px side padding plus the grid's 160px minimum tile width
+   leave too little room on a real phone screen for more than a single
+   column (e.g. at 375px wide, 24px padding on each side plus an 18px
+   gap only leaves room for one 160px+ tile, not two). Tightening the
+   shell padding and shrinking the minimum tile/gap size here keeps 2
+   (often 3, on a slightly wider phone) columns down to a 320px-wide
+   screen, without touching the grid's behavior at any wider breakpoint. */
+@media (max-width: 480px) {
+  .languages-page {
+    padding: 28px 14px 60px;
+  }
+
+  .languages-page__title {
+    font-size: 2.1rem;
+  }
+
+  .languages-page__grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 12px;
+  }
+
+  .languages-page__tile {
+    font-size: 1.1rem;
+    padding: 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .languages-page__tile {
     transition: none;

@@ -156,6 +156,28 @@
   display: none;
 }
 
+/* The "Welcome, {name}" greeting is unbounded plain text sitting inside
+   a flex row (the account-side .nav list) alongside Genres/My List/the
+   avatar/Logout — with no width limit of its own, a long profile name
+   (a visitor can type anything into "Who's watching?") stretches the
+   whole row wider than the header can hold, which either wraps the row
+   onto a second, ragged line or pushes Logout off toward the edge,
+   "disorganizing" the bar. This applies at every width the greeting is
+   actually shown at (it's dropped below 640px entirely — see the
+   max-width: 640px rule further down — but stays visible, and just as
+   unbounded before this, anywhere above that), so it's a plain rule
+   here rather than folded into one breakpoint. Capping its width and
+   ellipsizing means even an unusually long name just quietly truncates
+   instead of ever being able to break the row's layout. */
+.app-header__welcome {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
 /* ---- Medium screens ----
    The primary nav (Home/Shows/Movies/Browse by Languages) is the widest
    thing in the bar besides the account-side list, and it's the least
@@ -168,6 +190,14 @@
 @media (max-width: 900px) {
   .app-header__primary-nav {
     display: none;
+  }
+
+  /* The greeting has more of the bar to itself once the primary nav is
+     gone, but a very long name can still crowd Genres/My List/avatar/
+     Logout at this width — trimmed a bit further than the 160px default
+     above. */
+  .app-header__welcome {
+    max-width: 120px;
   }
 }
 

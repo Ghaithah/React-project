@@ -1,6 +1,26 @@
+/* !important on both rules below is deliberate defense-in-depth, matching
+   the pattern already used throughout this app (see the !important
+   overrides in Header.css/Footer.css) for fighting Bootstrap's own
+   styles: index.js now imports bootstrap.min.css BEFORE this file so the
+   plain (non-!important) versions of these rules would already win on
+   their own, but pinning them with !important means the dark background
+   can't silently regress again the next time something reorders an
+   import or adds another global stylesheet — which is exactly what
+   happened before (Bootstrap's reboot sets `body { background-color:
+   #fff; }`, and it was winning purely because of import order).
+
+   html gets the same dark background as body (not just body) so that
+   iOS/Android's overscroll "bounce" — rubber-banding past the very top
+   or very bottom of the page when you scroll up/down past the content —
+   reveals more of the same dark background instead of the browser's
+   default white canvas. */
+html {
+  background-color: #0d0f14 !important;
+}
+
 body {
   margin: 0;
-  background-color: #0d0f14;
+  background-color: #0d0f14 !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
