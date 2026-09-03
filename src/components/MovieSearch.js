@@ -311,7 +311,13 @@ function trackOmdbRequest() {
 // `fetch(...)` call to omdbapi.com elsewhere in this file goes through
 // this instead, so trackOmdbRequest() sees every OMDb request the
 // component makes, not just the ones batched through the pool.
-function fetchOmdb(url) {
+//
+// Exported so MovieChatBot.js's live catalog lookup (checking OMDb
+// directly for a title the visitor asks about, rather than only what
+// this session happens to have already fetched) shares the exact same
+// request + daily-quota-tracking path as every other OMDb call in the
+// app, instead of a second, divergent counter.
+export function fetchOmdb(url) {
   trackOmdbRequest();
   return fetch(url);
 }
@@ -1896,17 +1902,29 @@ export default function MovieSearch() {
   // front of the visitor. Capped well below what's actually loaded —
   // this is just grounding context for pattern-matching, not a place
   // that needs the full pool.
+  //
+  // IMPORTANT: this must include every title OMDb has returned, even one
+  // whose Genre/rating hasn't finished loading yet (the by-ID enrichment
+  // fetch above runs a beat after the initial search comes back) —
+  // earlier this filtered on `m.Genre` being truthy, which meant a title
+  // could be sitting right there in the search grid, fully visible to
+  // the person, while being completely invisible to allLoaded (and thus
+  // to the chatbot, which would then wrongly tell someone a title they
+  // could see on their own screen "isn't loaded on the site"). Genre is
+  // still included when available so the bot can answer genre/rating
+  // questions about it, it's just no longer a gate on being listed at
+  // all.
   const CATALOG_POOL_CAP = 150;
   useEffect(() => {
     const pool = new Map();
     [...browseMovies, ...similarPool, ...movies].forEach((m) => {
-      if (m && m.imdbID && m.Genre && !pool.has(m.imdbID)) {
+      if (m && m.imdbID && !pool.has(m.imdbID)) {
         pool.set(m.imdbID, {
           imdbID: m.imdbID,
           Title: m.Title,
           Year: m.Year,
           Type: m.Type,
-          Genre: m.Genre,
+          Genre: m.Genre || "",
           imdbRating: m.imdbRating ?? null,
           Plot: m.Plot || "",
         });
