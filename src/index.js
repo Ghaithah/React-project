@@ -24,6 +24,7 @@ import { ProfileProvider } from './components/ProfileContext';
 import { WatchHistoryProvider } from './components/WatchHistoryContext';
 import { MyListProvider } from './components/MyListContext';
 import { RatingsProvider } from './components/RatingsContext';
+import { MovieCatalogProvider } from './components/MovieCatalogContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -37,16 +38,26 @@ root.render(
         <WatchHistoryProvider>
           {/* Same reasoning as WatchHistoryProvider above: MovieSearch
               calls useMyList() unconditionally, so MyListProvider has to
-              wrap it too. Nested inside WatchHistoryProvider rather than
-              beside it purely so the two per-profile-storage providers
-              read top-to-bottom as one group. */}
+              wrap it too. Nested inside WatchHistoryProvider purely so
+              the two per-profile-storage providers read top-to-bottom as
+              one group. */}
           <MyListProvider>
             {/* Thumbs up/down (RatingsContext) is the same shape again —
                 per-profile localStorage, read unconditionally by
                 MovieSearch/MovieCard/HeroBanner/MovieInfoModal — so it
                 joins the same group of providers. */}
             <RatingsProvider>
-              <App />
+              {/* Powers the floating movie chatbot (MovieChatbot,
+                  rendered inside App): MovieSearch publishes what's
+                  currently loaded/visible into this context so the
+                  chatbot can ground its guardrails and answers in the
+                  real on-screen catalog instead of answering blind.
+                  Doesn't depend on auth/profile state itself, but sits
+                  here so it wraps App (and therefore both MovieSearch
+                  and MovieChatbot) in one place. */}
+              <MovieCatalogProvider>
+                <App />
+              </MovieCatalogProvider>
             </RatingsProvider>
           </MyListProvider>
         </WatchHistoryProvider>
@@ -56,4 +67,4 @@ root.render(
 );
 
 
-reportWebVitals();
+reportWebVitals();  

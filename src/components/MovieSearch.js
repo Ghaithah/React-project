@@ -4,6 +4,7 @@ import { useProfiles } from "./ProfileContext";
 import { useWatchHistory } from "./WatchHistoryContext";
 import { useMyList } from "./MyListContext";
 import { useRatings } from "./RatingsContext";
+import { useMovieCatalog } from "./MovieCatalogContext";
 import HeroBanner from "./HeroBanner";
 import MovieCard from "./MovieCard";
 import MovieInfoModal from "./MovieInfoModal";
@@ -956,6 +957,7 @@ export default function MovieSearch() {
   const { continueWatching, recordWatch, removeFromHistory } = useWatchHistory();
   const { myList, isInList, toggleInList } = useMyList();
   const { getRating, toggleLike, toggleDislike, likedIds, dislikedIds } = useRatings();
+  const { setCatalog } = useMovieCatalog();
   const kidsMode = !!(activeProfile && activeProfile.isKids);
 
   const [query, setQuery] = useState("");
@@ -1879,6 +1881,54 @@ export default function MovieSearch() {
 
     return list;
   }, [activeMovies, kidsMode, typeFilter, genreFilter, languageFilter, yearMin, yearMax, sortBy]);
+
+  // --- Publish the currently loaded/visible movies for the chatbot ---
+  // MovieChatbot is mounted once at the App level (outside this
+  // component's tree) so it has no direct access to any of the state
+  // above — this is the bridge: any time the underlying pools or the
+  // active filters/search change, a small, deduped summary gets pushed
+  // into MovieCatalogContext for the chatbot's guardrail + reply logic
+  // (see MovieChatbot.js) to read. `allLoaded` is the broad pool
+  // (everything fetched so far, across browse/search/similar-titles) the
+  // bot draws on for "best of <year>"/genre/title questions; `visible`
+  // is the narrower, currently-on-screen set (after filters/search) used
+  // for "recommend something" so the answer matches what's actually in
+  // front of the visitor. Capped well below what's actually loaded —
+  // this is just grounding context for pattern-matching, not a place
+  // that needs the full pool.
+  const CATALOG_POOL_CAP = 150;
+  useEffect(() => {
+    const pool = new Map();
+    [...browseMovies, ...similarPool, ...movies].forEach((m) => {
+      if (m && m.imdbID && m.Genre && !pool.has(m.imdbID)) {
+        pool.set(m.imdbID, {
+          imdbID: m.imdbID,
+          Title: m.Title,
+          Year: m.Year,
+          Type: m.Type,
+          Genre: m.Genre,
+          imdbRating: m.imdbRating ?? null,
+          Plot: m.Plot || "",
+        });
+      }
+    });
+
+    setCatalog({
+      allLoaded: Array.from(pool.values()).slice(0, CATALOG_POOL_CAP),
+      visible: filteredMovies.slice(0, CATALOG_POOL_CAP).map((m) => ({
+        imdbID: m.imdbID,
+        Title: m.Title,
+        Year: m.Year,
+        Type: m.Type,
+        Genre: m.Genre || "",
+        imdbRating: m.imdbRating ?? null,
+      })),
+      isSearching: searched,
+      searchQuery: debouncedQuery,
+      kidsMode,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browseMovies, similarPool, movies, filteredMovies, searched, debouncedQuery, kidsMode]);
 
   const activeFilterCount =
     (typeFilter ? 1 : 0) + (genreFilter ? 1 : 0) + (languageFilter ? 1 : 0) + (yearMin ? 1 : 0) + (yearMax ? 1 : 0);

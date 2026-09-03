@@ -3,6 +3,7 @@ import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import SplashScreen from './components/SplashScreen';
+import MovieChatbot from './components/MovieChatBot';
 import { useRoutes } from 'react-router-dom';
 import { routes } from './routes';
 
@@ -19,6 +20,14 @@ function App() {
         {elements}
       </main>
       <Footer/>
+      {/* Floating movie-chat assistant. Mounted here at the App level
+          (rather than inside MovieSearch) so it's available on every
+          route and its open/closed state + message history survive
+          navigating between pages instead of resetting each time. It
+          reads what's currently loaded/visible via MovieCatalogContext
+          (see index.js/MovieCatalogContext.js) — MovieSearch is what
+          publishes into that context. */}
+      <MovieChatbot />
       {/* Rendered on top of the real app (which is already mounted and
           loading underneath) so the exit fade reveals live content
           instead of a blank page — no white flash in between. */}
