@@ -110,7 +110,13 @@ function HeroBanner({
   onLike,
   onDislike,
 }) {
-  const hasPoster = !!movie.Poster && movie.Poster !== 'N/A';
+  // OMDb's Poster field sometimes points at an Amazon media URL that no
+  // longer resolves — that surfaces as a console 404 and, without this,
+  // a broken-image icon over the backdrop. Once the poster <img> actually
+  // fails to load, treat the title as posterless and fall back to the
+  // plain gradient, same as when OMDb has no Poster at all.
+  const [posterFailed, setPosterFailed] = useState(false);
+  const hasPoster = !!movie.Poster && movie.Poster !== 'N/A' && !posterFailed;
 
   const genres = useMemo(
     () =>
@@ -128,9 +134,12 @@ function HeroBanner({
   const [expanded, setExpanded] = useState(false);
   // Collapse back to the preview whenever the featured title itself
   // changes, so an expanded synopsis from a previous movie doesn't carry
-  // over and render as if it were the new title's full plot.
+  // over and render as if it were the new title's full plot. Also clears
+  // any earlier poster-load failure, since a fresh title deserves its own
+  // fresh attempt at loading its own poster.
   useEffect(() => {
     setExpanded(false);
+    setPosterFailed(false);
   }, [movie.imdbID]);
 
   return (
@@ -266,6 +275,7 @@ function HeroBanner({
           src={movie.Poster}
           alt={`${movie.Title} poster`}
           loading="eager"
+          onError={() => setPosterFailed(true)}
         />
       )}
       </div>

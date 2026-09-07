@@ -59,6 +59,13 @@ export default function MovieCard({
   const [previewState, setPreviewState] = useState('idle'); // idle | loading | ready | none
   const [previewId, setPreviewId] = useState(null);
   const [muted, setMuted] = useState(true);
+  // OMDb's Poster field frequently points at an Amazon media URL that no
+  // longer resolves (removed/expired on Amazon's end, not something this
+  // app controls) — that shows up as a 404 in the console and, without
+  // this, a broken-image icon on the card. Once the <img> actually fails
+  // to load, fall back to the same "No image" placeholder already used
+  // for a missing Poster field.
+  const [posterFailed, setPosterFailed] = useState(false);
   const hoverTimerRef = useRef(null);
   // Bumped every time hover starts/stops, so a resolveTrailerId() promise
   // that resolves after the pointer has already left (or re-entered a
@@ -74,6 +81,15 @@ export default function MovieCard({
   }
 
   useEffect(() => () => clearTimeout(hoverTimerRef.current), []);
+
+  // Each distinct movie gets its own MovieCard instance (every caller
+  // renders these with `key={movie.imdbID}`), so a prior failure never
+  // needs to be reset for the same instance — but resetting on imdbID
+  // change keeps this correct even if a future caller stops keying by
+  // id.
+  useEffect(() => {
+    setPosterFailed(false);
+  }, [movie.imdbID]);
 
   function handleMouseEnter() {
     if (!resolveTrailerId || !supportsHoverPreview()) return;
@@ -105,7 +121,7 @@ export default function MovieCard({
     onSelect(movie);
   }
 
-  const hasPoster = movie.Poster && movie.Poster !== 'N/A';
+  const hasPoster = movie.Poster && movie.Poster !== 'N/A' && !posterFailed;
   const genres = movie.Genre
     ? movie.Genre.split(',').map((g) => g.trim()).filter(Boolean).slice(0, 2)
     : [];
@@ -133,6 +149,7 @@ export default function MovieCard({
             alt={movie.Title}
             loading={eagerImage ? 'eager' : 'lazy'}
             decoding="async"
+            onError={() => setPosterFailed(true)}
           />
         ) : (
           <div className="movie-card__poster-placeholder">No image</div>

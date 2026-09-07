@@ -933,7 +933,20 @@ function renderPosterCard(movie, onSelect) {
     >
       <div className="movie-search__similar-poster">
         {movie.Poster !== "N/A" ? (
-          <img src={movie.Poster} alt={movie.Title} loading="lazy" decoding="async" />
+          <img
+            src={movie.Poster}
+            alt={movie.Title}
+            loading="lazy"
+            decoding="async"
+            // OMDb's Poster field frequently points at an Amazon media URL
+            // that no longer resolves (404) — that's an OMDb data-quality
+            // issue, not something fixable client-side. Hiding the broken
+            // <img> on error reveals this poster box's own neutral
+            // background instead of leaving a broken-image icon on screen.
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
         ) : (
           <div className="movie-search__similar-poster-placeholder">No image</div>
         )}
@@ -2720,7 +2733,15 @@ export default function MovieSearch() {
                         >
                           <div className="movie-search__suggestion-poster">
                             {m.Poster && m.Poster !== "N/A" ? (
-                              <img src={m.Poster} alt="" loading="lazy" decoding="async" />
+                              <img
+                                src={m.Poster}
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
                             ) : (
                               <div
                                 className="movie-search__suggestion-poster-placeholder"
@@ -3064,6 +3085,9 @@ export default function MovieSearch() {
                             alt={selectedPerson}
                             loading="lazy"
                             decoding="async"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
                           />
                         )}
                         <div className="movie-search__person-bio-text">
@@ -3284,6 +3308,9 @@ export default function MovieSearch() {
                           alt={movie.Title}
                           loading="lazy"
                           decoding="async"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
                         />
                       ) : (
                         <div className="movie-search__similar-poster-placeholder">No image</div>

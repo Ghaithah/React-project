@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import './MovieInfoModal.css';
 
 /**
@@ -56,7 +56,18 @@ export default function MovieInfoModal({
     };
   }, [onClose]);
 
-  const hasPoster = !!movie.Poster && movie.Poster !== 'N/A';
+  // OMDb's Poster field sometimes points at an Amazon media URL that no
+  // longer resolves — that surfaces as a console 404 and, without this,
+  // a broken-image icon over the hero backdrop. Once the poster <img>
+  // actually fails to load, fall back to the plain hero background, same
+  // as when OMDb has no Poster at all. Reset whenever a different title
+  // is opened so a previous failure doesn't stick around.
+  const [posterFailed, setPosterFailed] = useState(false);
+  useEffect(() => {
+    setPosterFailed(false);
+  }, [movie.imdbID]);
+
+  const hasPoster = !!movie.Poster && movie.Poster !== 'N/A' && !posterFailed;
   const genres = movie.Genre
     ? movie.Genre.split(',').map((g) => g.trim()).filter(Boolean)
     : [];
@@ -102,7 +113,19 @@ export default function MovieInfoModal({
       >
         <div className="movie-search__similar-poster">
           {m.Poster !== 'N/A' ? (
-            <img src={m.Poster} alt={m.Title} loading="lazy" decoding="async" />
+            <img
+              src={m.Poster}
+              alt={m.Title}
+              loading="lazy"
+              decoding="async"
+              // Same OMDb-poster-404 issue as the main hero poster above,
+              // just without per-card state: hiding the broken <img> on
+              // error reveals this poster box's own neutral background
+              // instead of a broken-image icon.
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           ) : (
             <div className="movie-search__similar-poster-placeholder">No image</div>
           )}
@@ -146,6 +169,7 @@ export default function MovieInfoModal({
                 className="movie-info-modal__poster"
                 src={movie.Poster}
                 alt={`${movie.Title} poster`}
+                onError={() => setPosterFailed(true)}
               />
             )}
             <div className="movie-info-modal__hero-text">
@@ -276,6 +300,9 @@ export default function MovieInfoModal({
                           src={personInfo.thumbnail}
                           alt={selectedPerson}
                           loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                       )}
                       <div className="movie-search__person-bio-text">
