@@ -3,9 +3,9 @@ import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import SplashScreen from './components/SplashScreen';
-import MovieChatbot from './components/MovieChatBot';
 import { useRoutes } from 'react-router-dom';
 import { routes } from './routes';
+import MovieChatbot from './components/MovieChatBot';
 
 function App() {
   const elements = useRoutes(routes)
