@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Same dark/gold token set every other top-level page shell in this app
+   redeclares locally (Genres.css, MyListPage.css, StatsPage.css, ...) —
+   this isn't nested inside .movie-search either, so it needs its own
+   copy rather than relying on that component's scope. */
+.error-boundary {
+  --bg: #0d0f14;
+  --surface: #14181f;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.error-boundary__box {
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 40px 32px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.error-boundary__kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: var(--gold);
+  margin: 0 0 10px;
+}
+
+.error-boundary__title {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--cream);
+  margin: 0 0 14px;
+}
+
+.error-boundary__body {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0 0 28px;
+}
+
+.error-boundary__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.error-boundary__home-btn,
+.error-boundary__reload-btn {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 10px 22px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.error-boundary__home-btn {
+  background: var(--gold);
+  color: #1a1400;
+  border: none;
+}
+
+.error-boundary__home-btn:hover,
+.error-boundary__home-btn:focus-visible {
+  background: var(--gold-dim);
+}
+
+.error-boundary__reload-btn {
+  background: transparent;
+  color: var(--cream);
+  border: 1px solid var(--border);
+}
+
+.error-boundary__reload-btn:hover,
+.error-boundary__reload-btn:focus-visible {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+@media (max-width: 480px) {
+  .error-boundary {
+    padding: 40px 16px;
+  }
+
+  .error-boundary__box {
+    padding: 32px 22px;
+  }
+
+  .error-boundary__title {
+    font-size: 1.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .error-boundary__home-btn,
+  .error-boundary__reload-btn {
+    transition: none;
+  }
+}

@@ -8,6 +8,7 @@ import Languages from "./components/Languages"
 import MyListPage from "./components/MyListPage"
 import StatsPage from "./components/StatsPage"
 import NewAndPopularPage from "./components/NewAndPopularPage"
+import NotFoundPage from "./components/NotFoundPage"
 
 export const routes=[
     {path:'/', element:<ProtectedRoute><RequireProfile><MovieSearch/></RequireProfile></ProtectedRoute>},
@@ -20,4 +21,10 @@ export const routes=[
     {path:'/new-and-popular', element:<ProtectedRoute><RequireProfile><NewAndPopularPage/></RequireProfile></ProtectedRoute>},
     {path:'/profiles', element:<ProtectedRoute><ProfileSelector/></ProtectedRoute>},
     {path:'/login', element:<Login/>},
+    // Catch-all: any URL that doesn't match one of the routes above —
+    // see NotFoundPage.js for why this deliberately sits outside
+    // ProtectedRoute/RequireProfile. Kept last since react-router-dom
+    // matches routes in array order and '*' would otherwise swallow
+    // every path listed after it.
+    {path:'*', element:<NotFoundPage/>},
 ]

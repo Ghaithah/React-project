@@ -779,6 +779,20 @@ export default function MovieChatbot() {
     return () => observer.disconnect();
   }, []);
 
+  // Standard modal-ish hygiene, same as MovieInfoModal.js's own Esc
+  // handler: closes the panel on Escape. Only attached while the panel
+  // is actually open, so it isn't listening (and doesn't need to be
+  // torn down) for the vast majority of a visit when the chat is
+  // collapsed to just the toggle button.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') setIsOpen(false);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   // `historyWithUser` is the full message list INCLUDING the just-sent
   // user turn, passed in explicitly by sendMessage rather than read back
   // from `messages` state — state updates are async, so `messages`
