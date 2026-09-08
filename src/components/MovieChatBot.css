@@ -15,12 +15,23 @@
 
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  /* --chatbot-footer-lift is set from JS (see MovieChatBot.js) to the
+     site footer's own rendered height, plus a small gap, but only while
+     the footer is actually visible in the viewport — 0px the rest of
+     the time, which reproduces the plain bottom-right corner placement
+     below exactly. Without this, a `position: fixed` element has no way
+     to know the footer exists at all: it always sits at a fixed
+     distance from the *viewport* bottom, so on any page short enough
+     for the footer to be on screen too (or simply once someone scrolls
+     all the way down), the button would render directly on top of the
+     footer's text instead of clearing it. */
+  bottom: calc(20px + var(--chatbot-footer-lift, 0px));
   z-index: 1050;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   font-family: 'Inter', system-ui, sans-serif;
+  transition: bottom 0.2s ease;
 }
 
 .movie-chatbot__toggle {
@@ -282,11 +293,12 @@
 
 /* Small screens: let the panel take most of the viewport instead of a
    fixed 360px card, and tuck the toggle button in a touch-friendly
-   corner. */
+   corner. Still adds --chatbot-footer-lift on top of the smaller base
+   offset, so the same footer-clearing behavior applies here too. */
 @media (max-width: 480px) {
   .movie-chatbot {
     right: 12px;
-    bottom: 12px;
+    bottom: calc(12px + var(--chatbot-footer-lift, 0px));
   }
 
   .movie-chatbot__panel {
@@ -296,6 +308,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .movie-chatbot,
   .movie-chatbot__toggle,
   .movie-chatbot__dot,
   .movie-chatbot__suggestion-chip {
