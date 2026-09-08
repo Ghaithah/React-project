@@ -98,6 +98,10 @@ function summarizeMinimal(text) {
  * either handler is passed. `myRating` is this profile's own opinion —
  * `'like'`, `'dislike'`, or `null` — distinct from `movie.imdbRating`
  * (OMDb's public score, shown in the meta row above).
+ *
+ * `matchScore` is the same per-profile "X% Match" personalization signal
+ * MovieCard shows — optional, same pattern: omit it and the pill simply
+ * doesn't render.
  */
 function HeroBanner({
   movie,
@@ -109,6 +113,7 @@ function HeroBanner({
   myRating = null,
   onLike,
   onDislike,
+  matchScore = null,
 }) {
   // OMDb's Poster field sometimes points at an Amazon media URL that no
   // longer resolves — that surfaces as a console 404 and, without this,
@@ -166,6 +171,9 @@ function HeroBanner({
         <h1 className="hero-banner__title">{movie.Title}</h1>
 
         <div className="hero-banner__meta">
+          {matchScore != null && (
+            <span className="hero-banner__match">{matchScore}% Match</span>
+          )}
           {movie.imdbRating != null && (
             <span className="hero-banner__rating">★ {movie.imdbRating.toFixed(1)}</span>
           )}

@@ -10,6 +10,12 @@
   --cream: #f2ede4;
   --muted: #8b93a1;
   --crimson: #e2645a;
+  /* Netflix's match-percentage green — deliberately the exact same green
+     already used elsewhere on this page for an active "like" (see
+     .movie-card__rate-toggle--like.is-active / .hero-banner__rate-btn--like
+     below) rather than a brand-new color, so "this is your taste" reads
+     as one consistent color language across thumbs and match badges. */
+  --match-green: #4caf7d;
 
   max-width: 800px;
   width: 100%;
@@ -264,6 +270,35 @@
   background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
   color: #1a1400;
   border-color: var(--gold);
+}
+
+/* --- "Play Something" shuffle button ---
+   Sits right next to the Filters toggle so it reads as a peer control in
+   the same row rather than a separate feature bolted on elsewhere. Same
+   outline treatment as the Filters toggle when idle (this page's
+   established language for a secondary action button) — it deliberately
+   does NOT borrow the Filters toggle's gold-filled `.is-active` look,
+   since a shuffle button has no persistent "on" state to show. */
+.movie-search__shuffle-btn {
+  padding: 0 20px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.movie-search__shuffle-btn:hover:not(:disabled) {
+  background: rgba(232, 176, 75, 0.1);
+}
+
+.movie-search__shuffle-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* --- Filters panel --- */
@@ -920,16 +955,16 @@
   color: var(--gold);
 }
 
-/* --- Browse rows (Continue Watching, My List, Because You Watched,
-   genre shelves) ---
+/* --- Browse rows (Continue Watching, My List, New Releases, Because You
+   Watched, genre shelves) ---
    The Netflix-style stack of horizontally-scrolling shelves that replaces
    the flat "Popular Right Now" grid on the plain browse view (no search,
    no filters/sort applied — see `showRows` in MovieSearch.js). Reuses
    the same horizontal-scroll + edge-fade treatment as
    .movie-search__similar-row/.movie-search__trending-row above; the
    cards themselves are just .movie-card rendered with the "row" variant
-   (fixed width instead of a grid cell) below. My List and the
-   personalized "Because You Watched" rows are plain
+   (fixed width instead of a grid cell) below. My List, New Releases, and
+   the personalized "Because You Watched" rows are plain
    .movie-search__row-section instances too — no dedicated CSS of their
    own needed, same as the genre shelves. */
 
@@ -1141,6 +1176,28 @@
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* --- "NEW" ribbon ---
+   Sits opposite the rating badge and the (hover-only) Continue Watching
+   remove control — bottom-left is the one poster corner nothing else
+   claims, so this can stay always-visible (not hover-gated) without
+   colliding with either. Crimson rather than gold/green so it reads as
+   its own, distinct signal from both the IMDb rating badge and the green
+   match-percentage line below the poster. */
+.movie-card__new-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: var(--crimson);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 /* --- Hover-preview video ---
@@ -1409,6 +1466,18 @@
   background: var(--surface);
 }
 
+/* --- "X% Match" personalization line ---
+   Sits above the title, same spot Netflix's own match percentage
+   occupies on its browse tiles. Uses the shared --match-green token
+   (the same green as an active "like" thumb elsewhere on this page) so
+   the whole app has one consistent color for "this is your taste." */
+.movie-card__match {
+  margin: 0 0 3px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--match-green);
+}
+
 .movie-card__title {
   font-weight: 600;
   font-size: 0.9rem;
@@ -1543,7 +1612,13 @@
    scrolling shelves (Continue Watching, My List, genre rows, Top 10)
    aren't grid-based so they were never affected by this, but their
    fixed card width is trimmed a little too so more of a row's next card
-   peeks into view as a "swipe for more" hint on a narrow screen. */
+   peeks into view as a "swipe for more" hint on a narrow screen.
+
+   The search row now also holds a third control (the shuffle button,
+   above) alongside the input and Filters toggle — three nowrap items
+   plus a flexible input no longer fit on one line down here, so this
+   also lets the row wrap: the input claims its own full-width line and
+   the two buttons share the line below it. */
 @media (max-width: 480px) {
   .movie-search {
     padding: 28px 14px 60px;
@@ -1555,9 +1630,15 @@
 
   .movie-search__search-row {
     gap: 8px;
+    flex-wrap: wrap;
   }
 
-  .movie-search__filter-toggle {
+  .movie-search__search-field {
+    flex: 1 1 100%;
+  }
+
+  .movie-search__filter-toggle,
+  .movie-search__shuffle-btn {
     padding: 0 14px;
     font-size: 0.85rem;
   }
@@ -1590,6 +1671,7 @@
 @media (prefers-reduced-motion: reduce) {
   .movie-card,
   .movie-search__filter-toggle,
+  .movie-search__shuffle-btn,
   .movie-search__load-more-btn,
   .movie-search__similar-card,
   .movie-card__hover-overlay,

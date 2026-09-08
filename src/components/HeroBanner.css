@@ -109,6 +109,21 @@
   margin-bottom: 16px;
 }
 
+/* "X% Match" pill — same shape/weight as .hero-banner__rating right next
+   to it, just in green instead of gold so it reads as a distinct signal:
+   the gold pill is OMDb's public rating, this one is this profile's own
+   estimated fit for the title. Shown first (see HeroBanner.js) since
+   personalization is the more Netflix-native lead signal. */
+.hero-banner__match {
+  background: rgba(76, 175, 125, 0.15);
+  color: #4caf7d;
+  border: 1px solid rgba(76, 175, 125, 0.4);
+  padding: 2px 9px;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
 .hero-banner__rating {
   background: rgba(232, 176, 75, 0.15);
   color: #e8b04b;
@@ -200,9 +215,9 @@
 
 /* Third action button, alongside Play/More Info — outlined rather than
    filled by default (so it doesn't compete with the solid-gold Play
-   button), filling gold once the title is saved to My List. Same
-   active-state language as MovieCard's list toggle and the filter
-   toggle elsewhere on the page. */
+   button), filling gold once the title is saved. Same active-state
+   language as MovieCard's list toggle and the filter toggle elsewhere on
+   the page. */
 .hero-banner__btn--list {
   background: rgba(255, 255, 255, 0.12);
   color: #f4f4f4;

@@ -6,7 +6,7 @@ import { useMyList } from "./MyListContext";
 import { useRatings } from "./RatingsContext";
 import { useMovieCatalog } from "./MovieCatalogContext";
 import HeroBanner from "./HeroBanner";
-import MovieCard from "./MovieCard";
+import MovieCard, { isRecentRelease } from "./MovieCard";
 import MovieInfoModal from "./MovieInfoModal";
 import "./MovieSearch.css";
 
@@ -900,6 +900,50 @@ const MIN_BECAUSE_YOU_WATCHED_ROW_SIZE = 5;
 // single like completely override a much stronger genre/director match.
 const LIKE_SCORE_BONUS = 1;
 
+// --- "New Releases" row ---
+// A dedicated shelf for recently-released titles — this app has no real
+// "added to catalog" date (that's not something OMDb exposes), so
+// release year is the closest available proxy for "new," and it reuses
+// the exact same isRecentRelease() helper (imported from MovieCard.js
+// above) that decides whether a card wears the NEW ribbon. One shared
+// definition of "new" instead of two that could quietly drift apart.
+const NEW_RELEASES_ROW_SIZE = 15;
+// Same reasoning as MIN_ROW_SIZE above: a thin "New Releases" row reads
+// as broken, not curated, so the row simply doesn't render until enough
+// recent titles have been found.
+const MIN_NEW_RELEASES_ROW_SIZE = 6;
+
+// --- "X% Match" personalization badge ---
+// Netflix's headline personalization signal: a green match percentage
+// shown on every card, distinct from the gold star badge (that's OMDb's
+// public IMDb rating — this one is specifically about YOU). Built from a
+// rough per-genre "taste profile" derived from what this profile has
+// actually watched, saved, and liked — a like counts for the most, a
+// watched title next, and a My List save least (adding something to a
+// list is a weaker signal of actual taste than watching or rating it).
+const TASTE_LIKE_WEIGHT = 3;
+const TASTE_WATCH_WEIGHT = 2;
+const TASTE_LIST_WEIGHT = 1;
+// The percentage band the score is normalized into. Netflix's own match
+// scores essentially never show below the high-30s or hit a flat 100 —
+// clamping here keeps the number feeling like a real computed estimate
+// rather than a raw 0-100 scale that could land on "4% Match" for an
+// otherwise perfectly decent title.
+const MATCH_SCORE_FLOOR = 34;
+const MATCH_SCORE_CEILING = 98;
+// How much a like/dislike nudges the base score once it's computed —
+// applied on TOP of the genre-affinity or rating-based base below, not
+// instead of it, so even a disliked title still shows some explanation
+// for its number rather than always reading as an arbitrary low one.
+const MATCH_SCORE_LIKE_BONUS = 10;
+const MATCH_SCORE_DISLIKE_PENALTY = 30;
+
+function movieGenres(movie) {
+  return movie && movie.Genre
+    ? movie.Genre.split(",").map((g) => g.trim()).filter(Boolean)
+    : [];
+}
+
 // --- Auto-load cap (genre-filtered browsing AND text search) ---
 // Applies the same ceiling everywhere scrolling can trigger more OMDb
 // requests on its own: a genre-filtered browse view (any genre — OMDb's
@@ -1616,6 +1660,87 @@ export default function MovieSearch() {
   const hasMore = searchHasMore || browseHasMore;
   const loadingMoreAny = loadingMore || browseLoadingMore;
 
+  // --- Derived: personalization "taste profile" + match score ---
+  // A rough per-genre affinity map built from what THIS profile has
+  // actually watched, saved to My List, and liked — see the weight
+  // constants above. Ratings only stores imdbIDs (see RatingsContext),
+  // not full movie objects, so a liked title's genres have to be looked
+  // up wherever they've already been loaded (continueWatching/myList
+  // themselves, or the broader browse/similar/search pools).
+  const tasteProfile = useMemo(() => {
+    const weights = new Map();
+    function addGenres(movie, weight) {
+      movieGenres(movie).forEach((g) => weights.set(g, (weights.get(g) || 0) + weight));
+    }
+    continueWatching.forEach((m) => addGenres(m, TASTE_WATCH_WEIGHT));
+    myList.forEach((m) => addGenres(m, TASTE_LIST_WEIGHT));
+    if (likedIds.size > 0) {
+      const seen = new Set();
+      [...continueWatching, ...myList, ...browseMovies, ...similarPool, ...movies].forEach((m) => {
+        if (m && m.imdbID && likedIds.has(m.imdbID) && !seen.has(m.imdbID)) {
+          seen.add(m.imdbID);
+          addGenres(m, TASTE_LIKE_WEIGHT);
+        }
+      });
+    }
+    return weights;
+  }, [continueWatching, myList, likedIds, browseMovies, similarPool, movies]);
+
+  // The taste profile's own strongest genre — used to normalize every
+  // title's raw weighted-genre-overlap sum onto the 0-1 scale that
+  // getMatchScore below maps onto MATCH_SCORE_FLOOR..MATCH_SCORE_CEILING.
+  const maxTasteWeight = useMemo(() => {
+    let max = 0;
+    tasteProfile.forEach((w) => {
+      if (w > max) max = w;
+    });
+    return max;
+  }, [tasteProfile]);
+
+  // Resolves a single movie's "X% Match" percentage. Two modes:
+  //  - Once this profile has SOME taste data (at least one watched/
+  //    listed/liked title with a genre), the score reflects how strongly
+  //    a title's own genres overlap with the taste profile above,
+  //    normalized against the profile's own strongest genre so a title
+  //    matching what this profile actually favors most reads close to
+  //    MATCH_SCORE_CEILING.
+  //  - Before any taste data exists (a brand-new profile), there's
+  //    nothing to compare against yet, so this falls back to OMDb's
+  //    public rating as a reasonable stand-in — a title everyone rates
+  //    highly is a safer generic recommendation than a random percentage
+  //    would be.
+  // A thumbs-up nudges the result up further, a thumbs-down pulls it
+  // down, on top of whichever base applied above — so a disliked title
+  // still shows *some* explanation for its number rather than reading as
+  // an arbitrary low one.
+  const getMatchScore = useCallback(
+    (movie) => {
+      if (!movie || !movie.imdbID) return null;
+      const genres = movieGenres(movie);
+
+      let base;
+      if (maxTasteWeight > 0 && genres.length > 0) {
+        const sum = genres.reduce((acc, g) => acc + (tasteProfile.get(g) || 0), 0);
+        const avgWeight = sum / genres.length;
+        const normalized = Math.min(1, avgWeight / maxTasteWeight);
+        base = MATCH_SCORE_FLOOR + normalized * (MATCH_SCORE_CEILING - MATCH_SCORE_FLOOR);
+      } else if (movie.imdbRating != null) {
+        // OMDb ratings run roughly 1-9.5 in practice — map that onto the
+        // same percentage band rather than treating it as a literal *10.
+        const normalized = Math.min(1, Math.max(0, (movie.imdbRating - 3) / 6));
+        base = MATCH_SCORE_FLOOR + normalized * (MATCH_SCORE_CEILING - MATCH_SCORE_FLOOR);
+      } else {
+        base = 60; // no genre data and no rating yet (still enriching) — a neutral placeholder
+      }
+
+      if (likedIds.has(movie.imdbID)) base += MATCH_SCORE_LIKE_BONUS;
+      if (dislikedIds.has(movie.imdbID)) base -= MATCH_SCORE_DISLIKE_PENALTY;
+
+      return Math.round(Math.min(MATCH_SCORE_CEILING, Math.max(20, base)));
+    },
+    [tasteProfile, maxTasteWeight, likedIds, dislikedIds]
+  );
+
   // --- Derived: Top 10 Today ---
   // A lightweight "trending" row that needs no extra API calls: it's just
   // the titles already loaded for the browse grid and the similar-titles
@@ -1660,6 +1785,33 @@ export default function MovieSearch() {
     return Array.from(candidates.values())
       .sort((a, b) => (b.imdbRating ?? -1) - (a.imdbRating ?? -1))
       .slice(0, 10);
+  }, [browseMovies, similarPool, kidsMode, dislikedIds, typeFilter]);
+
+  // --- Derived: "New Releases" row ---
+  // Same pooling approach as topTrending above (browseMovies, plus
+  // similarPool outside Kids mode), filtered down to titles
+  // isRecentRelease() (imported from MovieCard.js) counts as recent, and
+  // sorted newest-first with IMDb rating as the tiebreaker. Gated behind
+  // MIN_NEW_RELEASES_ROW_SIZE the same way the genre shelves are — a
+  // two- or three-poster "New Releases" row would read as broken, not
+  // curated, so it just doesn't render yet rather than showing half-empty.
+  const newReleases = useMemo(() => {
+    const pool = kidsMode ? browseMovies : [...browseMovies, ...similarPool];
+    const candidates = new Map();
+    pool.forEach((m) => {
+      if (!m || !m.imdbID || candidates.has(m.imdbID)) return;
+      if (kidsMode && !isKidSafe(m)) return;
+      if (typeFilter && m.Type !== typeFilter) return;
+      if (dislikedIds.has(m.imdbID)) return;
+      if (!isRecentRelease(m)) return;
+      candidates.set(m.imdbID, m);
+    });
+    const list = Array.from(candidates.values()).sort((a, b) => {
+      const yearDiff = (parseStartYear(b.Year) || 0) - (parseStartYear(a.Year) || 0);
+      if (yearDiff !== 0) return yearDiff;
+      return (b.imdbRating ?? -1) - (a.imdbRating ?? -1);
+    });
+    return list.length >= MIN_NEW_RELEASES_ROW_SIZE ? list.slice(0, NEW_RELEASES_ROW_SIZE) : [];
   }, [browseMovies, similarPool, kidsMode, dislikedIds, typeFilter]);
 
   // --- Derived: "Because You Watched" personalized rows ---
@@ -2131,6 +2283,40 @@ export default function MovieSearch() {
       next.set("movie", movie.imdbID);
       return next;
     });
+  }
+
+  // --- "Play Something" shuffle ---
+  // A weighted-random pick from whatever's currently on screen (the
+  // filtered browse grid, or the current search results) — squaring
+  // each candidate's own match score before using it as a pick weight
+  // means a title this profile is actually likely to enjoy gets picked
+  // far more often than a low-match one, while every title still keeps
+  // *some* chance, rather than either a flat uniform-random pick (no
+  // personalization at all) or always just handing back the single
+  // top-scoring title (no variety — every click would land on the same
+  // movie). Disliked titles are excluded outright, same as topTrending.
+  function playSomething() {
+    const pool = (filteredMovies.length > 0 ? filteredMovies : activeMovies).filter(
+      (m) => m && m.imdbID && !dislikedIds.has(m.imdbID)
+    );
+    if (pool.length === 0) return;
+
+    const weighted = pool.map((m) => ({
+      movie: m,
+      weight: Math.max(1, getMatchScore(m) || 50) ** 2,
+    }));
+    const totalWeight = weighted.reduce((sum, w) => sum + w.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let chosen = weighted[weighted.length - 1].movie;
+    for (const w of weighted) {
+      if (roll < w.weight) {
+        chosen = w.movie;
+        break;
+      }
+      roll -= w.weight;
+    }
+
+    openMovie(chosen);
   }
 
   // Opens the "More Info" modal for a title — a Netflix-style overlay with
@@ -2798,6 +2984,16 @@ export default function MovieSearch() {
 
           <button
             type="button"
+            onClick={playSomething}
+            className="movie-search__shuffle-btn"
+            disabled={activeMovies.length === 0}
+            title="Play something picked to match your taste"
+          >
+            🔀 Play Something
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowFilters((s) => !s)}
             className={`movie-search__filter-toggle ${activeFilterCount ? "is-active" : ""}`}
           >
@@ -2887,6 +3083,7 @@ export default function MovieSearch() {
           myRating={getRating(featuredMovie.imdbID)}
           onLike={() => toggleLike(featuredMovie)}
           onDislike={() => toggleDislike(featuredMovie)}
+          matchScore={getMatchScore(featuredMovie)}
         />
       )}
 
@@ -3222,6 +3419,7 @@ export default function MovieSearch() {
                 myRating={getRating(movie.imdbID)}
                 onLike={toggleLike}
                 onDislike={toggleDislike}
+                matchScore={getMatchScore(movie)}
               />
             ))}
           </div>
@@ -3245,6 +3443,31 @@ export default function MovieSearch() {
                 myRating={getRating(movie.imdbID)}
                 onLike={toggleLike}
                 onDislike={toggleDislike}
+                matchScore={getMatchScore(movie)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!searched && !activeLoading && newReleases.length > 0 && (
+        <div className="movie-search__row-section">
+          <h2 className="movie-search__section-title">New Releases</h2>
+          <div className="movie-search__row-track">
+            {newReleases.map((movie) => (
+              <MovieCard
+                key={movie.imdbID}
+                movie={movie}
+                variant="row"
+                onSelect={previewMovie}
+                onPlay={openMovie}
+                resolveTrailerId={resolveTrailerId}
+                isInList={isInList(movie.imdbID)}
+                onToggleList={toggleInList}
+                myRating={getRating(movie.imdbID)}
+                onLike={toggleLike}
+                onDislike={toggleDislike}
+                matchScore={getMatchScore(movie)}
               />
             ))}
           </div>
@@ -3269,6 +3492,7 @@ export default function MovieSearch() {
                   myRating={getRating(movie.imdbID)}
                   onLike={toggleLike}
                   onDislike={toggleDislike}
+                  matchScore={getMatchScore(movie)}
                 />
               ))}
             </div>
@@ -3353,6 +3577,7 @@ export default function MovieSearch() {
                   myRating={getRating(movie.imdbID)}
                   onLike={toggleLike}
                   onDislike={toggleDislike}
+                  matchScore={getMatchScore(movie)}
                 />
               ))}
             </div>
@@ -3383,6 +3608,7 @@ export default function MovieSearch() {
                 myRating={getRating(movie.imdbID)}
                 onLike={toggleLike}
                 onDislike={toggleDislike}
+                matchScore={getMatchScore(movie)}
               />
             ))}
           </div>
@@ -3442,6 +3668,7 @@ export default function MovieSearch() {
               myRating={getRating(movie.imdbID)}
               onLike={toggleLike}
               onDislike={toggleDislike}
+              matchScore={getMatchScore(movie)}
             />
           ))}
         </div>

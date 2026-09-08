@@ -17,6 +17,29 @@ function supportsHoverPreview() {
   return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 }
 
+// --- "NEW" badge ---
+// A movie counts as a recent release if its release year is within this
+// many years of today. This app has no real "added to catalog" date the
+// way an actual streaming service does, so release year is the closest
+// available proxy — deliberately generous (rather than "this year only",
+// which would make the badge disappear from almost every card almost
+// immediately). Exported so MovieSearch.js's "New Releases" row can
+// filter by exactly the same definition of "new" that decides whether a
+// card wears this badge — one shared source of truth instead of two
+// definitions that could quietly drift apart.
+export const NEW_RELEASE_WINDOW_YEARS = 2;
+
+export function isRecentRelease(movie) {
+  if (!movie || !movie.Year) return false;
+  const match = /\d{4}/.exec(movie.Year);
+  if (!match) return false;
+  const year = parseInt(match[0], 10);
+  const diff = new Date().getFullYear() - year;
+  // Also counts a title dated next year as "new" (an upcoming/just-listed
+  // release), rather than only ever looking backward.
+  return diff >= -1 && diff <= NEW_RELEASE_WINDOW_YEARS;
+}
+
 /**
  * A single poster card used across the browse/search grid, the genre
  * rows, and Continue Watching. Shares one visual language (poster,
@@ -40,6 +63,12 @@ function supportsHoverPreview() {
  * title — `'like'`, `'dislike'`, or `null` — never to be confused with
  * `movie.imdbRating` (OMDb's public rating, shown separately as the gold
  * badge in the corner of the poster).
+ *
+ * `matchScore` is a third, independent signal — this profile's own
+ * estimated percentage fit for the title (see getMatchScore in
+ * MovieSearch.js), rendered as a small green "X% Match" line above the
+ * title. Optional: a caller that hasn't wired up match scoring can
+ * simply omit it and the line doesn't render at all.
  */
 export default function MovieCard({
   movie,
@@ -55,6 +84,7 @@ export default function MovieCard({
   myRating = null,
   onLike,
   onDislike,
+  matchScore = null,
 }) {
   const [previewState, setPreviewState] = useState('idle'); // idle | loading | ready | none
   const [previewId, setPreviewId] = useState(null);
@@ -126,6 +156,7 @@ export default function MovieCard({
     ? movie.Genre.split(',').map((g) => g.trim()).filter(Boolean).slice(0, 2)
     : [];
   const showPreview = previewState === 'ready' && previewId;
+  const showNewBadge = isRecentRelease(movie);
 
   return (
     <div
@@ -185,6 +216,12 @@ export default function MovieCard({
 
         {movie.imdbRating != null && (
           <span className="movie-card__rating">{Number(movie.imdbRating).toFixed(1)}</span>
+        )}
+
+        {showNewBadge && (
+          <span className="movie-card__new-badge" aria-hidden="true">
+            NEW
+          </span>
         )}
 
         {onRemove && (
@@ -294,6 +331,9 @@ export default function MovieCard({
       </div>
 
       <div className="movie-card__info">
+        {matchScore != null && (
+          <p className="movie-card__match">{matchScore}% Match</p>
+        )}
         <p className="movie-card__title">{movie.Title}</p>
         <p className="movie-card__meta">
           {movie.Year} · {movie.Type}
