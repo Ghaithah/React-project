@@ -1,0 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Same page shell pattern as Genres.css/MyListPage.css/
+   NewAndPopularPage.css — each top-level page redeclares these
+   variables locally rather than relying on MovieSearch.css's
+   .movie-search scope. --match-green is pulled in here too since the
+   genre bars reuse the same green already established for match-score
+   pills elsewhere in this app, rather than inventing a second accent
+   color for "this is a positive/taste signal." */
+.stats-page {
+  --bg: #0d0f14;
+  --surface: #14181f;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+  --match-green: #4caf6b;
+
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.stats-page__title {
+  text-align: center;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 0 0 32px;
+  color: var(--cream);
+}
+
+.stats-page__empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-top: 40px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.stats-page__empty a {
+  color: var(--gold);
+  text-decoration: underline;
+}
+
+/* ---- Stat tiles ---- */
+.stats-page__tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+.stats-page__tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 12px;
+  text-align: center;
+}
+
+.stats-page__tile-value {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--gold);
+  margin: 0 0 4px;
+  line-height: 1;
+}
+
+.stats-page__tile-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* ---- Sections (genres, decade, loved titles) ---- */
+.stats-page__section {
+  margin-bottom: 48px;
+}
+
+.stats-page__section:last-child {
+  margin-bottom: 0;
+}
+
+.stats-page__section-title {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--cream);
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- Genre bar chart ---- */
+.stats-page__genre-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stats-page__genre-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 28px;
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-page__genre-name {
+  font-size: 0.88rem;
+  color: var(--cream);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-page__genre-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.stats-page__genre-fill {
+  height: 100%;
+  background: var(--match-green);
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.stats-page__genre-count {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* ---- Favorite decade ---- */
+.stats-page__decade-value {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--gold);
+  margin: 0;
+}
+
+/* ---- Titles You Loved grid ---- */
+.stats-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+}
+
+/* ---- Small phones ---- */
+@media (max-width: 480px) {
+  .stats-page {
+    padding: 28px 14px 60px;
+  }
+
+  .stats-page__title {
+    font-size: 2.1rem;
+  }
+
+  .stats-page__section-title {
+    font-size: 1.35rem;
+  }
+
+  .stats-page__tiles {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .stats-page__tile-value {
+    font-size: 1.8rem;
+  }
+
+  .stats-page__genre-row {
+    grid-template-columns: 84px 1fr 24px;
+    gap: 8px;
+  }
+
+  .stats-page__grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-page__genre-fill {
+    transition: none;
+  }
+}

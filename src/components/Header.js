@@ -18,11 +18,15 @@ import './Header.css'
 // reads that marker to decide whether "/movies" means "just movies" (the
 // tab) or "everything, optionally by genre" (a Genre tile), so this tab
 // still lights up (NavLink ignores the query string when matching) while
-// genre browsing isn't accidentally narrowed to movies only.
+// genre browsing isn't accidentally narrowed to movies only. New &
+// Popular (see NewAndPopularPage.js) sits right after Movies — it's the
+// other "browse everything" entry point, just pre-filtered to what's
+// recent/trending instead of pre-filtered to type.
 const PRIMARY_NAV_LINKS = [
   { to: '/', label: 'Home', end: true },
   { to: '/shows', label: 'Shows' },
   { to: '/movies?type=movie', label: 'Movies' },
+  { to: '/new-and-popular', label: 'New & Popular' },
   { to: '/languages', label: 'Browse by Languages' },
 ];
 
@@ -93,6 +97,16 @@ function Header(props) {
                   <li className="nav-item">
                     <Link className="nav-link" to="/my-list">My List</Link>
                   </li>
+                  {/* Same reasoning again, for the "Your Year in Review"
+                      recap (see components/StatsPage.js) — a per-profile
+                      activity summary built entirely from state this app
+                      already tracks (Continue Watching, My List,
+                      ratings), given its own findable spot rather than
+                      being buried somewhere only discoverable by
+                      accident. */}
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/stats">Stats</Link>
+                  </li>
                   <li className="nav-item">
                     <button
                       type="button"
@@ -135,19 +149,19 @@ function Header(props) {
         </ul>
       </div>
 
-      {/* Second row: Home / Shows / Movies / Browse by Languages, always
-          rendered here (not duplicated inline next to the brand for
-          desktop and separately for mobile — that was tried and it
-          rendered both copies at once on wide screens, since the CSS
-          meant to hide one of them didn't reliably apply everywhere it
-          was tested). One single list, styled to just work at any width:
-          it's a plain non-scrolling row when everything fits (typical
-          desktop/tablet widths), and only becomes horizontally
-          scrollable — same fade-edge + thin-scrollbar treatment the
-          movie shelves elsewhere in this app already use — once it
-          genuinely doesn't fit, which in practice is roughly phone
-          width. See .app-header__primary-row/.app-header__primary-nav
-          in Header.css. */}
+      {/* Second row: Home / Shows / Movies / New & Popular / Browse by
+          Languages, always rendered here (not duplicated inline next to
+          the brand for desktop and separately for mobile — that was
+          tried and it rendered both copies at once on wide screens,
+          since the CSS meant to hide one of them didn't reliably apply
+          everywhere it was tested). One single list, styled to just
+          work at any width: it's a plain non-scrolling row when
+          everything fits (typical desktop/tablet widths), and only
+          becomes horizontally scrollable — same fade-edge + thin-
+          scrollbar treatment the movie shelves elsewhere in this app
+          already use — once it genuinely doesn't fit, which in practice
+          is roughly phone width. See .app-header__primary-row/
+          .app-header__primary-nav in Header.css. */}
       {showPrimaryNav && (
         <div className="container app-header__primary-row">
           <ul className="app-header__primary-nav mb-0">

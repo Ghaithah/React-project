@@ -824,7 +824,7 @@ const KID_UNSAFE_GENRES = [
 // does not.
 const KID_SAFE_RATINGS = ["G", "PG", "TV-Y", "TV-Y7", "TV-Y7-FV", "TV-G", "TV-PG"];
 
-function isKidSafe(movie) {
+export function isKidSafe(movie) {
   if (!movie || !movie.Genre) return false;
   const genres = movie.Genre.split(",").map((g) => g.trim()).filter(Boolean);
   if (genres.length === 0) return false;
@@ -2093,6 +2093,16 @@ export default function MovieSearch() {
           Genre: m.Genre || "",
           imdbRating: m.imdbRating ?? null,
           Plot: m.Plot || "",
+          // Poster + Rated aren't needed for the chatbot's own text
+          // answers (the original reason this context existed), but
+          // carrying them along costs nothing and is what lets other
+          // consumers of this same pool — see NewAndPopularPage.js's
+          // "New & Popular" page — render real MovieCard grids and run
+          // the same isKidSafe() rating check MovieSearch uses, instead
+          // of duplicating a whole second OMDb fetch just to get a
+          // poster image and a Rated field.
+          Poster: m.Poster || "",
+          Rated: m.Rated || "",
         });
       }
     });
@@ -2106,6 +2116,8 @@ export default function MovieSearch() {
         Type: m.Type,
         Genre: m.Genre || "",
         imdbRating: m.imdbRating ?? null,
+        Poster: m.Poster || "",
+        Rated: m.Rated || "",
       })),
       isSearching: searched,
       searchQuery: debouncedQuery,

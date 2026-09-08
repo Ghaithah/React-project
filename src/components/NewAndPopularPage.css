@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Same page shell as Genres.css/MyListPage.css — each top-level page
+   redeclares these variables locally (rather than relying on
+   MovieSearch.css's .movie-search scope) since none of these pages nest
+   inside that component. This page is wider than the single-grid pages
+   (1400px vs 900px) since it's two full shelves stacked rather than one
+   grid — the narrower width made rows feel cramped once tested. */
+.new-and-popular-page {
+  --bg: #0d0f14;
+  --surface: #14181f;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.new-and-popular-page__title {
+  text-align: center;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 0 0 32px;
+  color: var(--cream);
+}
+
+.new-and-popular-page__empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-top: 40px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.new-and-popular-page__empty a {
+  color: var(--gold);
+  text-decoration: underline;
+}
+
+.new-and-popular-page__section {
+  margin-bottom: 48px;
+}
+
+.new-and-popular-page__section:last-child {
+  margin-bottom: 0;
+}
+
+.new-and-popular-page__section-title {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--cream);
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.new-and-popular-page__section-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.new-and-popular-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+}
+
+/* ---- Small phones ----
+   Same fix applied throughout this app's other page shells: the shell's
+   side padding plus the grid's 160px minimum card width leave too
+   little room on a real phone screen for more than a single column.
+   Tightening the shell padding and shrinking the minimum card/gap size
+   here keeps 2 (often 3) columns down to a 320px-wide screen. */
+@media (max-width: 480px) {
+  .new-and-popular-page {
+    padding: 28px 14px 60px;
+  }
+
+  .new-and-popular-page__title {
+    font-size: 2.1rem;
+  }
+
+  .new-and-popular-page__section-title {
+    font-size: 1.35rem;
+  }
+
+  .new-and-popular-page__grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 12px;
+  }
+}

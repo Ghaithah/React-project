@@ -6,6 +6,8 @@ import ProfileSelector from "./components/ProfileSelector"
 import Genres from "./components/Genres"
 import Languages from "./components/Languages"
 import MyListPage from "./components/MyListPage"
+import StatsPage from "./components/StatsPage"
+import NewAndPopularPage from "./components/NewAndPopularPage"
 
 export const routes=[
     {path:'/', element:<ProtectedRoute><RequireProfile><MovieSearch/></RequireProfile></ProtectedRoute>},
@@ -14,6 +16,8 @@ export const routes=[
     {path:'/genres', element:<ProtectedRoute><RequireProfile><Genres/></RequireProfile></ProtectedRoute>},
     {path:'/languages', element:<ProtectedRoute><RequireProfile><Languages/></RequireProfile></ProtectedRoute>},
     {path:'/my-list', element:<ProtectedRoute><RequireProfile><MyListPage/></RequireProfile></ProtectedRoute>},
+    {path:'/stats', element:<ProtectedRoute><RequireProfile><StatsPage/></RequireProfile></ProtectedRoute>},
+    {path:'/new-and-popular', element:<ProtectedRoute><RequireProfile><NewAndPopularPage/></RequireProfile></ProtectedRoute>},
     {path:'/profiles', element:<ProtectedRoute><ProfileSelector/></ProtectedRoute>},
     {path:'/login', element:<Login/>},
 ]
