@@ -51,26 +51,68 @@ export function WatchHistoryProvider({ children }) {
   // Continue Watching row actually needs are kept — no point storing the
   // full OMDb payload (Plot, Actors, etc.) just to remember "recently
   // opened this".
+  //
+  // `progress` (how far into the trailer this profile got — see
+  // updateProgress below) is deliberately carried over from any existing
+  // entry rather than reset to 0 here: this runs every time a trailer is
+  // opened, including re-opening a title already in Continue Watching to
+  // pick up where you left off, and resetting progress on every open
+  // would make "resume" impossible.
   const recordWatch = useCallback(
     (movie) => {
       if (!key || !movie || !movie.imdbID) return;
-      const entry = {
-        imdbID: movie.imdbID,
-        Title: movie.Title,
-        Poster: movie.Poster,
-        Year: movie.Year,
-        Type: movie.Type,
-        Genre: movie.Genre || '',
-        imdbRating: movie.imdbRating ?? null,
-      };
       setHistory((prev) => {
+        const existing = prev.find((m) => m.imdbID === movie.imdbID);
         const withoutExisting = prev.filter((m) => m.imdbID !== movie.imdbID);
+        const entry = {
+          imdbID: movie.imdbID,
+          Title: movie.Title,
+          Poster: movie.Poster,
+          Year: movie.Year,
+          Type: movie.Type,
+          Genre: movie.Genre || '',
+          imdbRating: movie.imdbRating ?? null,
+          progress: existing && typeof existing.progress === 'number' ? existing.progress : 0,
+        };
         const updated = [entry, ...withoutExisting].slice(0, MAX_ENTRIES);
         localStorage.setItem(key, JSON.stringify(updated));
         return updated;
       });
     },
     [key]
+  );
+
+  // Updates just the progress fraction (0-1, how far into its trailer
+  // this title has been watched) for a title already in Continue
+  // Watching — called periodically while a trailer is playing, and once
+  // more on pause/end/close (see TrailerPlayer.js). A no-op if the title
+  // isn't in history at all (shouldn't normally happen, since
+  // recordWatch always runs first when a trailer opens, but this stays
+  // safe rather than silently re-adding a title from a stray progress
+  // update).
+  const updateProgress = useCallback(
+    (imdbID, progress) => {
+      if (!key || !imdbID || typeof progress !== 'number' || Number.isNaN(progress)) return;
+      const clamped = Math.max(0, Math.min(1, progress));
+      setHistory((prev) => {
+        if (!prev.some((m) => m.imdbID === imdbID)) return prev;
+        const updated = prev.map((m) => (m.imdbID === imdbID ? { ...m, progress: clamped } : m));
+        localStorage.setItem(key, JSON.stringify(updated));
+        return updated;
+      });
+    },
+    [key]
+  );
+
+  // Reads back a title's saved progress (0-1), defaulting to 0 for a
+  // title that's either not in history yet or was saved before this
+  // field existed.
+  const getProgress = useCallback(
+    (imdbID) => {
+      const entry = history.find((m) => m.imdbID === imdbID);
+      return entry && typeof entry.progress === 'number' ? entry.progress : 0;
+    },
+    [history]
   );
 
   const removeFromHistory = useCallback(
@@ -91,7 +133,14 @@ export function WatchHistoryProvider({ children }) {
 
   return (
     <WatchHistoryContext.Provider
-      value={{ continueWatching: history, recordWatch, removeFromHistory, clearHistory }}
+      value={{
+        continueWatching: history,
+        recordWatch,
+        removeFromHistory,
+        clearHistory,
+        updateProgress,
+        getProgress,
+      }}
     >
       {children}
     </WatchHistoryContext.Provider>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { RESUME_MIN_FRACTION, RESUME_MAX_FRACTION } from './TrailerPlayer';
 
 // How long the pointer has to linger before a hover preview starts —
 // long enough that just sweeping across a row of posters doesn't fire a
@@ -69,6 +70,13 @@ export function isRecentRelease(movie) {
  * MovieSearch.js), rendered as a small green "X% Match" line above the
  * title. Optional: a caller that hasn't wired up match scoring can
  * simply omit it and the line doesn't render at all.
+ *
+ * `progress` is this title's saved trailer-watch progress (0-1, from
+ * WatchHistoryContext.getProgress/TrailerPlayer.js) — optional, and in
+ * practice only ever non-zero for a Continue Watching card. When set and
+ * meaningfully in progress, it draws a thin resume bar along the bottom
+ * edge of the poster and swaps the hover Play button's label to
+ * "Resume".
  */
 export default function MovieCard({
   movie,
@@ -85,6 +93,7 @@ export default function MovieCard({
   onLike,
   onDislike,
   matchScore = null,
+  progress = null,
 }) {
   const [previewState, setPreviewState] = useState('idle'); // idle | loading | ready | none
   const [previewId, setPreviewId] = useState(null);
@@ -157,6 +166,9 @@ export default function MovieCard({
     : [];
   const showPreview = previewState === 'ready' && previewId;
   const showNewBadge = isRecentRelease(movie);
+  const showResumeBar = typeof progress === 'number' && progress > 0;
+  const showResumeLabel =
+    typeof progress === 'number' && progress > RESUME_MIN_FRACTION && progress < RESUME_MAX_FRACTION;
 
   return (
     <div
@@ -224,6 +236,15 @@ export default function MovieCard({
           </span>
         )}
 
+        {showResumeBar && (
+          <div className="movie-card__progress-track" aria-hidden="true">
+            <div
+              className="movie-card__progress-fill"
+              style={{ width: `${Math.round(Math.min(1, progress) * 100)}%` }}
+            />
+          </div>
+        )}
+
         {onRemove && (
           <button
             type="button"
@@ -262,9 +283,9 @@ export default function MovieCard({
                 // onKeyDown, which would fire handleActivate() a second time.
                 if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
               }}
-              aria-label={`Play ${movie.Title} trailer`}
+              aria-label={showResumeLabel ? `Resume ${movie.Title} trailer` : `Play ${movie.Title} trailer`}
             >
-              <span aria-hidden="true">▶</span> Play
+              <span aria-hidden="true">▶</span> {showResumeLabel ? 'Resume' : 'Play'}
             </button>
             {onToggleList && (
               <button

@@ -8,6 +8,7 @@ import { useMovieCatalog } from "./MovieCatalogContext";
 import HeroBanner from "./HeroBanner";
 import MovieCard, { isRecentRelease } from "./MovieCard";
 import MovieInfoModal from "./MovieInfoModal";
+import TrailerPlayer from "./TrailerPlayer";
 import "./MovieSearch.css";
 
 
@@ -1017,7 +1018,7 @@ const SORT_OPTIONS = [
 
 export default function MovieSearch() {
   const { activeProfile } = useProfiles();
-  const { continueWatching, recordWatch, removeFromHistory } = useWatchHistory();
+  const { continueWatching, recordWatch, removeFromHistory, updateProgress, getProgress } = useWatchHistory();
   const { myList, isInList, toggleInList } = useMyList();
   const { getRating, toggleLike, toggleDislike, likedIds, dislikedIds } = useRatings();
   const { setCatalog } = useMovieCatalog();
@@ -3146,13 +3147,11 @@ export default function MovieSearch() {
               <div className="movie-search__trailer-status">{trailerError}</div>
             )}
             {!trailerLoading && !trailerError && trailerId && (
-              <iframe
+              <TrailerPlayer
                 key={trailerId}
-                src={`https://www.youtube.com/embed/${trailerId}?autoplay=1`}
-                title={`${selectedMovie.Title} trailer`}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+                videoId={trailerId}
+                initialProgress={getProgress(selectedMovie.imdbID)}
+                onProgress={(fraction) => updateProgress(selectedMovie.imdbID, fraction)}
               />
             )}
           </div>
@@ -3420,6 +3419,7 @@ export default function MovieSearch() {
                 onLike={toggleLike}
                 onDislike={toggleDislike}
                 matchScore={getMatchScore(movie)}
+                progress={movie.progress ?? 0}
               />
             ))}
           </div>
