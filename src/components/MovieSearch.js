@@ -9,6 +9,7 @@ import HeroBanner from "./HeroBanner";
 import MovieCard, { isRecentRelease } from "./MovieCard";
 import MovieInfoModal from "./MovieInfoModal";
 import TrailerPlayer from "./TrailerPlayer";
+import ScrollableRow from "./ScrollableRow";
 import "./MovieSearch.css";
 
 
@@ -3330,14 +3331,14 @@ export default function MovieSearch() {
                     )}
 
                     {personTitles.length > 0 && (
-                      <div className="movie-search__similar-row">
+                      <ScrollableRow trackClassName="movie-search__similar-row" ariaLabel={`More with ${selectedPerson}`}>
                         {personTitles.map((m) =>
                           renderPosterCard(m, () => {
                             setSelectedPerson(null);
                             previewMovie(m);
                           })
                         )}
-                      </div>
+                      </ScrollableRow>
                     )}
                   </div>
                 )}
@@ -3399,9 +3400,9 @@ export default function MovieSearch() {
                 {similarTitles.length > 0 && (
                   <div className="movie-search__similar">
                     <h3 className="movie-search__similar-title">You Might Also Like</h3>
-                    <div className="movie-search__similar-row">
+                    <ScrollableRow trackClassName="movie-search__similar-row" ariaLabel="You Might Also Like">
                       {similarTitles.map((m) => renderPosterCard(m, () => previewMovie(m)))}
-                    </div>
+                    </ScrollableRow>
                   </div>
                 )}
               </>
@@ -3415,7 +3416,7 @@ export default function MovieSearch() {
           <h2 className="movie-search__section-title">
             Continue Watching{activeProfile ? ` for ${activeProfile.name}` : ""}
           </h2>
-          <div className="movie-search__row-track">
+          <ScrollableRow trackClassName="movie-search__row-track" ariaLabel="Continue Watching">
             {visibleContinueWatching.map((movie) => (
               <MovieCard
                 key={movie.imdbID}
@@ -3434,14 +3435,14 @@ export default function MovieSearch() {
                 progress={movie.progress ?? 0}
               />
             ))}
-          </div>
+          </ScrollableRow>
         </div>
       )}
 
       {!searched && !activeLoading && visibleMyList.length > 0 && (
         <div className="movie-search__row-section">
           <h2 className="movie-search__section-title">My List</h2>
-          <div className="movie-search__row-track">
+          <ScrollableRow trackClassName="movie-search__row-track" ariaLabel="My List">
             {visibleMyList.map((movie) => (
               <MovieCard
                 key={movie.imdbID}
@@ -3458,14 +3459,14 @@ export default function MovieSearch() {
                 matchScore={getMatchScore(movie)}
               />
             ))}
-          </div>
+          </ScrollableRow>
         </div>
       )}
 
       {!searched && !activeLoading && newReleases.length > 0 && (
         <div className="movie-search__row-section">
           <h2 className="movie-search__section-title">New Releases</h2>
-          <div className="movie-search__row-track">
+          <ScrollableRow trackClassName="movie-search__row-track" ariaLabel="New Releases">
             {newReleases.map((movie) => (
               <MovieCard
                 key={movie.imdbID}
@@ -3482,7 +3483,7 @@ export default function MovieSearch() {
                 matchScore={getMatchScore(movie)}
               />
             ))}
-          </div>
+          </ScrollableRow>
         </div>
       )}
 
@@ -3490,7 +3491,7 @@ export default function MovieSearch() {
         becauseYouWatchedRows.map((row) => (
           <div className="movie-search__row-section" key={row.seedId}>
             <h2 className="movie-search__section-title">Because You Watched {row.seedTitle}</h2>
-            <div className="movie-search__row-track">
+            <ScrollableRow trackClassName="movie-search__row-track" ariaLabel={`Because You Watched ${row.seedTitle}`}>
               {row.movies.map((movie) => (
                 <MovieCard
                   key={movie.imdbID}
@@ -3507,7 +3508,7 @@ export default function MovieSearch() {
                   matchScore={getMatchScore(movie)}
                 />
               ))}
-            </div>
+            </ScrollableRow>
           </div>
         ))}
 
@@ -3516,7 +3517,10 @@ export default function MovieSearch() {
           <h2 className="movie-search__section-title">
             {kidsMode ? "Top 10 Kids' Picks Today" : "Top 10 Today"}
           </h2>
-          <div className="movie-search__trending-row">
+          <ScrollableRow
+            trackClassName="movie-search__trending-row"
+            ariaLabel={kidsMode ? "Top 10 Kids' Picks Today" : "Top 10 Today"}
+          >
             {topTrending.map((movie, i) => (
               <div
                 key={movie.imdbID}
@@ -3557,7 +3561,7 @@ export default function MovieSearch() {
                 </div>
               </div>
             ))}
-          </div>
+          </ScrollableRow>
         </div>
       )}
 
@@ -3574,7 +3578,7 @@ export default function MovieSearch() {
                 See All ›
               </button>
             </div>
-            <div className="movie-search__row-track">
+            <ScrollableRow trackClassName="movie-search__row-track" ariaLabel={row.genre}>
               {row.movies.map((movie) => (
                 <MovieCard
                   key={movie.imdbID}
@@ -3592,7 +3596,7 @@ export default function MovieSearch() {
                   matchScore={getMatchScore(movie)}
                 />
               ))}
-            </div>
+            </ScrollableRow>
           </div>
         ))}
 

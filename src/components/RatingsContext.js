@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { useProfiles } from './ProfileContext';
+import { useToast } from './ToastContext';
 
 const RatingsContext = createContext(null);
 
@@ -60,6 +61,7 @@ function persistRatings(key, map) {
 export function RatingsProvider({ children }) {
   const { user } = useAuth();
   const { activeProfileId } = useProfiles();
+  const { showToast } = useToast();
   const key = ratingsKey(user, activeProfileId);
 
   const [ratings, setRatings] = useState(() => loadRatings(key));
@@ -73,6 +75,24 @@ export function RatingsProvider({ children }) {
     setRatings(loadRatings(key));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  // Sets kept alongside the map, same pattern MyListContext uses for its
+  // own O(1) isInList() lookups — these get checked on every card render
+  // across every row, so a Set beats re-scanning the map each time.
+  // Declared up here, ahead of toggleLike/toggleDislike below, so those
+  // callbacks can read "was this already liked/disliked?" BEFORE calling
+  // setRatings — see the comment on toggleLike for why that ordering
+  // matters. Also exposed so MovieSearch can use them to keep disliked
+  // titles out of recommendation rows and give liked titles a small
+  // ranking boost.
+  const likedIds = useMemo(
+    () => new Set(Object.keys(ratings).filter((id) => ratings[id] === 'like')),
+    [ratings]
+  );
+  const dislikedIds = useMemo(
+    () => new Set(Object.keys(ratings).filter((id) => ratings[id] === 'dislike')),
+    [ratings]
+  );
 
   // Sets a title's rating outright — 'like', 'dislike', or a falsy value
   // to clear it. The two toggle helpers below are what the thumbs
@@ -99,9 +119,16 @@ export function RatingsProvider({ children }) {
   // it straight to liked. Single entry point so MovieCard/HeroBanner/
   // MovieInfoModal don't each need to inspect the current rating before
   // deciding what to do — same shape as MyListContext's toggleInList.
+  //
+  // `wasLiked` is read from the already-memoized `likedIds` BEFORE
+  // setRatings runs, for the same Strict-Mode-safety reason
+  // MyListContext.toggleInList computes `wasInList` up front: a
+  // showToast() call made from inside the setRatings functional updater
+  // would be double-invoked by React 18 Strict Mode in development.
   const toggleLike = useCallback(
     (movie) => {
       if (!key || !movie || !movie.imdbID) return;
+      const wasLiked = likedIds.has(movie.imdbID);
       setRatings((prev) => {
         const isAlreadyLiked = prev[movie.imdbID] === 'like';
         const next = { ...prev };
@@ -111,13 +138,15 @@ export function RatingsProvider({ children }) {
         persistRatings(key, next);
         return next;
       });
+      showToast(wasLiked ? 'Removed like' : 'Liked', wasLiked ? 'info' : 'like');
     },
-    [key]
+    [key, likedIds, showToast]
   );
 
   const toggleDislike = useCallback(
     (movie) => {
       if (!key || !movie || !movie.imdbID) return;
+      const wasDisliked = dislikedIds.has(movie.imdbID);
       setRatings((prev) => {
         const isAlreadyDisliked = prev[movie.imdbID] === 'dislike';
         const next = { ...prev };
@@ -127,8 +156,9 @@ export function RatingsProvider({ children }) {
         persistRatings(key, next);
         return next;
       });
+      showToast(wasDisliked ? 'Removed dislike' : 'Disliked', wasDisliked ? 'info' : 'dislike');
     },
-    [key]
+    [key, dislikedIds, showToast]
   );
 
   const clearRating = useCallback(
@@ -150,20 +180,6 @@ export function RatingsProvider({ children }) {
   }, [key]);
 
   const getRating = useCallback((imdbID) => ratings[imdbID] || null, [ratings]);
-
-  // Sets kept alongside the map, same pattern MyListContext uses for its
-  // own O(1) isInList() lookups — these get checked on every card render
-  // across every row, so a Set beats re-scanning the map each time.
-  // Exposed so MovieSearch can use them to keep disliked titles out of
-  // recommendation rows and give liked titles a small ranking boost.
-  const likedIds = useMemo(
-    () => new Set(Object.keys(ratings).filter((id) => ratings[id] === 'like')),
-    [ratings]
-  );
-  const dislikedIds = useMemo(
-    () => new Set(Object.keys(ratings).filter((id) => ratings[id] === 'dislike')),
-    [ratings]
-  );
 
   return (
     <RatingsContext.Provider

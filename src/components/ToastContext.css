@@ -1,0 +1,113 @@
+/* ToastContext.js renders its stack at the App level, outside
+   .movie-search's DOM scope, so — same convention MovieChatBot.css
+   uses for the floating chatbot — it defines its own locally-scoped
+   custom properties mirroring .movie-search's palette rather than
+   relying on inheritance that wouldn't reach it. */
+.toast-stack {
+  --toast-gold: #e8b04b;
+  --toast-cream: #f2ede4;
+  --toast-surface: #14181f;
+  --toast-border: #282e3a;
+  --toast-muted: #8b93a1;
+  --toast-crimson: #e2645a;
+  --toast-green: #4caf7d;
+
+  position: fixed;
+  left: 20px;
+  bottom: 24px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 40px));
+  /* The stack element itself spans an area that includes empty space
+     above whatever toasts are currently showing — that empty space
+     shouldn't intercept clicks meant for the page underneath it. */
+  pointer-events: none;
+}
+
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--toast-surface);
+  border: 1px solid var(--toast-border);
+  border-left: 3px solid var(--toast-gold);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  color: var(--toast-cream);
+  font-size: 0.9rem;
+  pointer-events: auto;
+  animation: toast-slide-in 0.22s ease-out;
+}
+
+.toast-item--like {
+  border-left-color: var(--toast-green);
+}
+
+.toast-item--dislike {
+  border-left-color: var(--toast-crimson);
+}
+
+.toast-item--info {
+  border-left-color: var(--toast-muted);
+}
+
+.toast-item__icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.toast-item__message {
+  flex: 1;
+  line-height: 1.35;
+}
+
+.toast-item__dismiss {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--toast-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+}
+
+.toast-item__dismiss:hover,
+.toast-item__dismiss:focus-visible {
+  color: var(--toast-cream);
+}
+
+.toast-item__dismiss:focus-visible {
+  outline: 2px solid var(--toast-gold);
+  outline-offset: 2px;
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-item {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .toast-stack {
+    left: 12px;
+    right: 12px;
+    bottom: 16px;
+    max-width: none;
+  }
+}

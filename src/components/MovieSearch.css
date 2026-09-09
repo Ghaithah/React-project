@@ -824,6 +824,98 @@
   color: var(--muted);
 }
 
+/* --- Scrollable row paging arrows (ScrollableRow.js) ---
+   Netflix-style ‹ › paging controls shared by every horizontally-
+   scrolling shelf on this page — genre rows, Continue Watching, My
+   List, New Releases, Because You Watched, Top 10 Today, "You Might
+   Also Like", and a cast/crew member's own filmography row. Rendered by
+   ScrollableRow.js, which wraps whichever existing track class
+   (.movie-search__row-track / .movie-search__trending-row /
+   .movie-search__similar-row, all defined further below) a given shelf
+   already used — this wrapper adds nothing to the track's own layout,
+   sizing, or edge-fade styling, it only supplies the positioning
+   context the two arrow buttons sit in.
+
+   Arrows are conditionally RENDERED by ScrollableRow.js itself (absent
+   from the DOM once there's nothing left to scroll in that direction),
+   so the opacity/hover treatment below is purely about *revealing* an
+   arrow that's already there, not about hiding a dead control — there
+   is never a dead control here to hide. */
+.scrollable-row {
+  position: relative;
+}
+
+.scrollable-row__arrow {
+  position: absolute;
+  top: 0;
+  /* Stops short of the track's own bottom padding (see
+     .movie-search__row-track/.movie-search__trending-row/
+     .movie-search__similar-row below, all padded ~10-14px at the
+     bottom for the horizontal scrollbar) so the arrow's clickable area
+     lines up with the poster row itself rather than extending down
+     into that scrollbar strip. */
+  bottom: 14px;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--cream);
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.scrollable-row__arrow--prev {
+  left: 0;
+  background: linear-gradient(to right, rgba(13, 15, 20, 0.85) 0%, rgba(13, 15, 20, 0.55) 60%, rgba(13, 15, 20, 0) 100%);
+  justify-content: flex-start;
+  padding-left: 6px;
+}
+
+.scrollable-row__arrow--next {
+  right: 0;
+  background: linear-gradient(to left, rgba(13, 15, 20, 0.85) 0%, rgba(13, 15, 20, 0.55) 60%, rgba(13, 15, 20, 0) 100%);
+  justify-content: flex-end;
+  padding-right: 6px;
+}
+
+.scrollable-row__arrow:hover,
+.scrollable-row__arrow:focus-visible {
+  color: var(--gold);
+}
+
+.scrollable-row__arrow:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+/* Desktop/trackpad: arrows stay invisible (but still present, so a
+   keyboard user tabbing through can still reach and focus them — see
+   the focus-visible rule above) until the shelf itself is hovered, the
+   same reveal-on-hover language this app already uses for a card's own
+   hover overlay (see .movie-card__hover-overlay in this file). */
+@media (hover: hover) and (pointer: fine) {
+  .scrollable-row:hover .scrollable-row__arrow {
+    opacity: 1;
+  }
+}
+
+/* Touch / no real hover: there's no hover state to reveal an arrow on,
+   so it stays visible at a slightly reduced opacity instead of invisible
+   forever. Real swipe/drag scrolling still works exactly as before —
+   this is just an extra, always-available tap target alongside it. */
+@media not all and (hover: hover) {
+  .scrollable-row__arrow {
+    opacity: 0.85;
+  }
+}
+
 /* --- Similar titles ("You Might Also Like") --- */
 
 .movie-search__similar {
@@ -1652,7 +1744,11 @@
    above) alongside the input and Filters toggle — three nowrap items
    plus a flexible input no longer fit on one line down here, so this
    also lets the row wrap: the input claims its own full-width line and
-   the two buttons share the line below it. */
+   the two buttons share the line below it.
+
+   The scrollable-row arrows (above) are narrowed a touch too — 44px is
+   comfortable next to a 170px+ row card on desktop, but eats visibly
+   into the already-tight 132px row card width set below. */
 @media (max-width: 480px) {
   .movie-search {
     padding: 28px 14px 60px;
@@ -1699,6 +1795,11 @@
   .movie-search__trending-rank {
     font-size: 3.6rem;
   }
+
+  .scrollable-row__arrow {
+    width: 34px;
+    font-size: 1.6rem;
+  }
 }
 
 /* ---- Motion respect ---- */
@@ -1714,7 +1815,8 @@
   .movie-card__rate-toggle,
   .movie-card__remove-badge,
   .movie-card__mute-toggle,
-  .movie-search__trending-poster-wrap {
+  .movie-search__trending-poster-wrap,
+  .scrollable-row__arrow {
     transition: none;
   }
 

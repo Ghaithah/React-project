@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { useProfiles } from './ProfileContext';
+import { useToast } from './ToastContext';
 
 const MyListContext = createContext(null);
 
@@ -48,6 +49,7 @@ function toEntry(movie) {
 export function MyListProvider({ children }) {
   const { user } = useAuth();
   const { activeProfileId } = useProfiles();
+  const { showToast } = useToast();
   const key = listKey(user, activeProfileId);
 
   const [list, setList] = useState(() => loadList(key));
@@ -60,6 +62,15 @@ export function MyListProvider({ children }) {
     setList(loadList(key));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  // A Set of saved ids kept alongside the array so isInList() lookups —
+  // called on every card render, for every card, on every row — are O(1)
+  // instead of re-scanning the whole list each time. Declared up here,
+  // ahead of toggleInList/removeFromList below, so those callbacks can
+  // read "was this already saved?" BEFORE calling setList — see the
+  // comment on toggleInList for why that ordering matters.
+  const listIds = useMemo(() => new Set(list.map((m) => m.imdbID)), [list]);
+  const isInList = useCallback((imdbID) => listIds.has(imdbID), [listIds]);
 
   const addToList = useCallback(
     (movie) => {
@@ -81,17 +92,28 @@ export function MyListProvider({ children }) {
         if (key) localStorage.setItem(key, JSON.stringify(updated));
         return updated;
       });
+      showToast('Removed from My List', 'success');
     },
-    [key]
+    [key, showToast]
   );
 
   // What every "+ My List" button actually calls: adds the title if it's
   // not saved yet, removes it if it already is. Single entry point so
   // callers (MovieCard, HeroBanner, MovieInfoModal) don't each need to
   // track membership themselves before deciding which function to call.
+  //
+  // `wasInList` is read from the already-memoized `listIds` BEFORE
+  // setList runs, rather than showToast() being called from inside the
+  // setList functional updater below. React 18 Strict Mode
+  // double-invokes updater functions in development to help surface
+  // impure ones — a showToast() call living inside that updater would
+  // fire twice per click and show a duplicate toast. Computing the
+  // before-state first and calling showToast() once, outside the
+  // updater, sidesteps that entirely.
   const toggleInList = useCallback(
     (movie) => {
       if (!key || !movie || !movie.imdbID) return;
+      const wasInList = listIds.has(movie.imdbID);
       setList((prev) => {
         const exists = prev.some((m) => m.imdbID === movie.imdbID);
         const updated = exists
@@ -100,20 +122,15 @@ export function MyListProvider({ children }) {
         localStorage.setItem(key, JSON.stringify(updated));
         return updated;
       });
+      showToast(wasInList ? 'Removed from My List' : 'Added to My List', 'success');
     },
-    [key]
+    [key, listIds, showToast]
   );
 
   const clearList = useCallback(() => {
     if (key) localStorage.setItem(key, JSON.stringify([]));
     setList([]);
   }, [key]);
-
-  // A Set of saved ids kept alongside the array so isInList() lookups —
-  // called on every card render, for every card, on every row — are O(1)
-  // instead of re-scanning the whole list each time.
-  const listIds = useMemo(() => new Set(list.map((m) => m.imdbID)), [list]);
-  const isInList = useCallback((imdbID) => listIds.has(imdbID), [listIds]);
 
   return (
     <MyListContext.Provider
