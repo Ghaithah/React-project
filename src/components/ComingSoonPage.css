@@ -1,0 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Same page shell as MyListPage.css/Genres.css (max-width, dark palette
+   variables, Bebas Neue title) so this reads as the same app rather than
+   a bolted-on screen — each top-level page redeclares these variables
+   locally rather than relying on MovieSearch.css's .movie-search scope,
+   since none of these pages nest inside that component. */
+.coming-soon-page {
+  --bg: #0d0f14;
+  --surface: #14181f;
+  --border: #282e3a;
+  --gold: #e8b04b;
+  --gold-dim: #c99138;
+  --cream: #f2ede4;
+  --muted: #8b93a1;
+  --crimson: #e2645a;
+
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.coming-soon-page__title {
+  text-align: center;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+  color: var(--cream);
+}
+
+.coming-soon-page__subtitle {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 560px;
+  margin: 0 auto 32px;
+  line-height: 1.5;
+}
+
+/* Loading/empty state — a bordered card rather than bare floating text,
+   so "nothing to show yet" still reads as a deliberate, finished part of
+   the page instead of a gap where the grid should have been. Same
+   surface/border treatment .coming-soon-page__warning already uses. */
+.coming-soon-page__state {
+  max-width: 480px;
+  margin: 48px auto 0;
+  padding: 32px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.coming-soon-page__state-text {
+  color: var(--cream);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.coming-soon-page__state-subtext {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 10px 0 0;
+}
+
+.coming-soon-page__warning {
+  text-align: center;
+  color: var(--crimson);
+  font-size: 0.85rem;
+  background: rgba(226, 100, 90, 0.1);
+  border: 1px solid rgba(226, 100, 90, 0.3);
+  border-radius: 6px;
+  padding: 10px 14px;
+  max-width: 480px;
+  margin: 0 auto 24px;
+}
+
+/* Same card grid MovieSearch.css/MyListPage.css use for their own
+   grids — reused by class name here too so a MovieCard dropped into any
+   of these pages lines up identically. */
+.coming-soon-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+}
+
+/* ---- Small phones ----
+   Same fix applied to MovieSearch.css/MyListPage.css/Genres.css: the
+   page shell's 24px side padding plus the grid's 160px minimum card
+   width leave too little room on a real phone screen for more than a
+   single column. Tightening the shell padding and shrinking the minimum
+   card/gap size here keeps 2 (often 3, on a slightly wider phone)
+   columns down to a 320px-wide screen. */
+@media (max-width: 480px) {
+  .coming-soon-page {
+    padding: 28px 14px 60px;
+  }
+
+  .coming-soon-page__state {
+    margin-top: 32px;
+    padding: 24px 18px;
+  }
+
+  .coming-soon-page__title {
+    font-size: 2.1rem;
+  }
+
+  .coming-soon-page__grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 12px;
+  }
+}

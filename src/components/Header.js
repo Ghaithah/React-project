@@ -97,6 +97,18 @@ function Header(props) {
                   <li className="nav-item">
                     <Link className="nav-link" to="/my-list">My List</Link>
                   </li>
+                  {/* Same reasoning again, for titles OMDb already has a
+                      future release date for (see
+                      components/ComingSoonPage.js). This used to be a
+                      shelf on the browse page too — same problem as My
+                      List used to have: easy to miss, and entirely
+                      dependent on a future-dated title already sitting
+                      in the general browse pool by chance. A dedicated
+                      page can go looking for one on demand instead of
+                      hoping. */}
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/coming-soon">Coming Soon</Link>
+                  </li>
                   {/* Same reasoning again, for the "Your Year in Review"
                       recap (see components/StatsPage.js) — a per-profile
                       activity summary built entirely from state this app

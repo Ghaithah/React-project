@@ -42,7 +42,10 @@ if (process.env.NODE_ENV !== "production" && (!API_KEY || !YOUTUBE_API_KEY)) {
 // out — that in any realistic scrolling session "Load more" never runs
 // dry. It's bounded by OMDb's actual catalog and your API quota (free
 // tier: 1,000 requests/day), not by a hardcoded list size.
-const BROWSE_QUERY_TERMS = [
+// Exported so ComingSoonPage.js can search the exact same broad term
+// pool the main browse grid uses, rather than maintaining a second,
+// smaller list that could drift out of sync with this one.
+export const BROWSE_QUERY_TERMS = [
   "the", "man", "love", "life", "day", "night", "story", "world", "girl",
   "boy", "king", "war", "house", "time", "dark", "star", "black", "white",
   "blue", "red", "last", "new", "one", "two", "three", "good", "bad",
@@ -697,6 +700,41 @@ function parseStartYear(yearField) {
   return match ? parseInt(match[0], 10) : null;
 }
 
+const RELEASED_MONTH_ABBR = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+// OMDb's "Released" field comes back as "18 Dec 2026" for titles that
+// have one, and "N/A" (or occasionally "TBA") for the many that don't —
+// parsed by hand, rather than handed to `new Date(str)`, so a string in
+// exactly this shape is the only thing ever accepted. Browsers vary in
+// how forgiving their built-in date parser is with anything else OMDb
+// might hand back, and a silently-wrong date here would misfile a title
+// into (or out of) the Coming Soon shelf below.
+export function parseReleasedDate(movie) {
+  const raw = movie && movie.Released;
+  if (!raw) return null;
+  const match = /^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/.exec(raw.trim());
+  if (!match) return null;
+  const month = RELEASED_MONTH_ABBR[match[2]];
+  if (month === undefined) return null;
+  const date = new Date(parseInt(match[3], 10), month, parseInt(match[1], 10));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+// A title counts as "Coming Soon" once it has a real, parseable release
+// date that's still in the future. Most of OMDb's catalog is already-
+// released content — this app has no dedicated "upcoming releases" data
+// source, so this naturally stays a short, honest list drawn from
+// whatever future-dated titles happen to already be loaded, rather than
+// guessing from Year alone the way isRecentRelease() does for
+// already-released titles.
+export function isUpcomingRelease(movie) {
+  const released = parseReleasedDate(movie);
+  return released ? released.getTime() > Date.now() : false;
+}
+
 
 const PLOT_MAX_LENGTH = 320;
 const PLOT_MAX_SENTENCES = 3;
@@ -730,7 +768,12 @@ export function truncatePlot(text) {
   return result.length < trimmed.length ? result : trimmed;
 }
 
-function parseDetailToMovie(detail) {
+// Exported so ComingSoonPage.js's own by-ID lookups get the exact same
+// field mapping/normalization (imdbRating parsed to a number, missing
+// fields defaulted to "" rather than undefined, etc.) MovieCard and every
+// row on the main browse page already assume, instead of a second mapping
+// that could quietly drift out of sync with this one.
+export function parseDetailToMovie(detail) {
   return {
     Title: detail.Title,
     Year: detail.Year,
@@ -753,6 +796,10 @@ function parseDetailToMovie(detail) {
     // it's what powers the "Browse by Languages" filter (see
     // languageFilter below).
     Language: detail.Language || "",
+    // Same reasoning again — captured for free so the Coming Soon shelf
+    // (see isUpcomingRelease() above) doesn't need a dedicated request
+    // just to find out whether a title has an upcoming release date.
+    Released: detail.Released || "",
     imdbRating:
       detail.imdbRating && detail.imdbRating !== "N/A"
         ? parseFloat(detail.imdbRating)
@@ -777,6 +824,7 @@ function mergeDetailIntoMovie(movie, detail) {
     Runtime: detail.Runtime || "",
     Rated: detail.Rated || "",
     Language: detail.Language || "",
+    Released: detail.Released || "",
     imdbRating: detail.imdbRating && detail.imdbRating !== "N/A" ? parseFloat(detail.imdbRating) : null,
   };
 }
@@ -901,6 +949,16 @@ const MIN_BECAUSE_YOU_WATCHED_ROW_SIZE = 5;
 // equally-genre-matched title that hasn't been rated, without letting a
 // single like completely override a much stronger genre/director match.
 const LIKE_SCORE_BONUS = 1;
+
+// --- "Because You Liked" personalized rows ---
+// A second family of personalized shelves alongside "Because You
+// Watched" above, this time seeded from titles this profile has given a
+// thumbs-up rather than from Continue Watching — a visitor who rates
+// titles but doesn't have (or hasn't opened) much watch history still
+// gets a personalized shelf this way. Same shape as the constants above.
+const BECAUSE_YOU_LIKED_SEED_COUNT = 3;
+const BECAUSE_YOU_LIKED_ROW_SIZE = 12;
+const MIN_BECAUSE_YOU_LIKED_ROW_SIZE = 5;
 
 // --- "New Releases" row ---
 // A dedicated shelf for recently-released titles — this app has no real
@@ -1894,6 +1952,89 @@ export default function MovieSearch() {
 
     return rows;
   }, [continueWatching, browseMovies, similarPool, movies, kidsMode, dislikedIds, likedIds, typeFilter]);
+
+  // --- Derived: "Because You Liked" personalized rows ---
+  // Same shared-genre scoring as becauseYouWatchedRows above, just
+  // seeded from RatingsContext.likedIds instead of Continue Watching.
+  //
+  // likedIds only stores imdbIDs (see RatingsContext), with no title or
+  // genre data of its own, so the full movie object for each liked id
+  // has to be looked up wherever it's already been loaded — same
+  // approach tasteProfile above uses. Object.keys() on a plain object
+  // preserves insertion order, so reversing that lookup gives
+  // (approximately) most-recently-liked first, mirroring how
+  // continueWatching is already ordered newest-first.
+  const becauseYouLikedRows = useMemo(() => {
+    if (likedIds.size === 0) return [];
+
+    const likedMovies = new Map();
+    [...continueWatching, ...myList, ...browseMovies, ...similarPool, ...movies].forEach((m) => {
+      if (m && m.imdbID && m.Genre && likedIds.has(m.imdbID) && !likedMovies.has(m.imdbID)) {
+        likedMovies.set(m.imdbID, m);
+      }
+    });
+    if (likedMovies.size === 0) return [];
+
+    // Same reasoning as topTrending/becauseYouWatchedRows above:
+    // similarPool is a general-audience pool never curated for the Kids
+    // profile, so it's excluded entirely in Kids mode.
+    const source = kidsMode ? [...browseMovies, ...movies] : [...browseMovies, ...similarPool, ...movies];
+    const pool = new Map();
+    source.forEach((m) => {
+      if (!m || !m.imdbID || !m.Genre || pool.has(m.imdbID)) return;
+      if (kidsMode && !isKidSafe(m)) return;
+      if (typeFilter && m.Type !== typeFilter) return;
+      if (dislikedIds.has(m.imdbID)) return;
+      // A title already liked isn't a new recommendation — the visitor
+      // already knows they like it, so it's excluded from the candidate
+      // pool the same way watchedIds excludes Continue Watching titles
+      // from becauseYouWatchedRows above.
+      if (likedIds.has(m.imdbID)) return;
+      pool.set(m.imdbID, m);
+    });
+
+    const usedIds = new Set();
+    const minRowSize = kidsMode
+      ? Math.min(MIN_BECAUSE_YOU_LIKED_ROW_SIZE, MIN_ROW_SIZE_KIDS)
+      : MIN_BECAUSE_YOU_LIKED_ROW_SIZE;
+
+    // Newest-liked-first, limited to the active type filter for the same
+    // reason becauseYouWatchedRows limits its own seeds — a liked title
+    // shouldn't headline a shelf while the Shows tab has filtered
+    // everything else on the page down to series only.
+    const seeds = Array.from(likedMovies.values())
+      .reverse()
+      .filter((m) => !typeFilter || m.Type === typeFilter)
+      .slice(0, BECAUSE_YOU_LIKED_SEED_COUNT);
+
+    const rows = [];
+    seeds.forEach((seed) => {
+      const targetGenres = new Set(
+        seed.Genre.split(",").map((g) => g.trim()).filter(Boolean)
+      );
+      if (targetGenres.size === 0) return;
+
+      const scored = [];
+      pool.forEach((m) => {
+        if (m.imdbID === seed.imdbID || usedIds.has(m.imdbID)) return;
+        const genres = m.Genre.split(",").map((g) => g.trim()).filter(Boolean);
+        const shared = genres.filter((g) => targetGenres.has(g)).length;
+        if (shared === 0) return;
+        scored.push({ movie: m, score: shared });
+      });
+      scored.sort(
+        (a, b) => b.score - a.score || (b.movie.imdbRating ?? -1) - (a.movie.imdbRating ?? -1)
+      );
+
+      const picks = scored.slice(0, BECAUSE_YOU_LIKED_ROW_SIZE).map((s) => s.movie);
+      if (picks.length < minRowSize) return; // too thin to read as a real recommendation shelf
+
+      picks.forEach((m) => usedIds.add(m.imdbID));
+      rows.push({ seedId: seed.imdbID, seedTitle: seed.Title, movies: picks });
+    });
+
+    return rows;
+  }, [likedIds, continueWatching, myList, browseMovies, similarPool, movies, kidsMode, dislikedIds, typeFilter]);
 
   // --- Derived: genre-based browse rows ---
   // Groups the curated browse pool by genre into Netflix-style shelves.
@@ -3492,6 +3633,31 @@ export default function MovieSearch() {
           <div className="movie-search__row-section" key={row.seedId}>
             <h2 className="movie-search__section-title">Because You Watched {row.seedTitle}</h2>
             <ScrollableRow trackClassName="movie-search__row-track" ariaLabel={`Because You Watched ${row.seedTitle}`}>
+              {row.movies.map((movie) => (
+                <MovieCard
+                  key={movie.imdbID}
+                  movie={movie}
+                  variant="row"
+                  onSelect={previewMovie}
+                  onPlay={openMovie}
+                  resolveTrailerId={resolveTrailerId}
+                  isInList={isInList(movie.imdbID)}
+                  onToggleList={toggleInList}
+                  myRating={getRating(movie.imdbID)}
+                  onLike={toggleLike}
+                  onDislike={toggleDislike}
+                  matchScore={getMatchScore(movie)}
+                />
+              ))}
+            </ScrollableRow>
+          </div>
+        ))}
+
+      {!searched && !activeLoading &&
+        becauseYouLikedRows.map((row) => (
+          <div className="movie-search__row-section" key={row.seedId}>
+            <h2 className="movie-search__section-title">Because You Liked {row.seedTitle}</h2>
+            <ScrollableRow trackClassName="movie-search__row-track" ariaLabel={`Because You Liked ${row.seedTitle}`}>
               {row.movies.map((movie) => (
                 <MovieCard
                   key={movie.imdbID}

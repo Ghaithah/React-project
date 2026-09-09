@@ -8,6 +8,7 @@ import Languages from "./components/Languages"
 import MyListPage from "./components/MyListPage"
 import StatsPage from "./components/StatsPage"
 import NewAndPopularPage from "./components/NewAndPopularPage"
+import ComingSoonPage from "./components/ComingSoonPage"
 import NotFoundPage from "./components/NotFoundPage"
 
 export const routes=[
@@ -19,6 +20,7 @@ export const routes=[
     {path:'/my-list', element:<ProtectedRoute><RequireProfile><MyListPage/></RequireProfile></ProtectedRoute>},
     {path:'/stats', element:<ProtectedRoute><RequireProfile><StatsPage/></RequireProfile></ProtectedRoute>},
     {path:'/new-and-popular', element:<ProtectedRoute><RequireProfile><NewAndPopularPage/></RequireProfile></ProtectedRoute>},
+    {path:'/coming-soon', element:<ProtectedRoute><RequireProfile><ComingSoonPage/></RequireProfile></ProtectedRoute>},
     {path:'/profiles', element:<ProtectedRoute><ProfileSelector/></ProtectedRoute>},
     {path:'/login', element:<Login/>},
     // Catch-all: any URL that doesn't match one of the routes above —
