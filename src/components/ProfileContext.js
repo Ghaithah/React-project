@@ -14,6 +14,47 @@ const ACTIVE_PROFILE_KEY_PREFIX = 'movieapp_active_profile_';
 // likes between regular and Kids profiles.
 export const MAX_PROFILES = 6;
 
+// --- Profile PIN lock ---
+// A profile can optionally be locked behind a 4-digit PIN — Netflix's own
+// "Profile Lock" feature, scoped per profile here (rather than one PIN
+// for the whole account) so, e.g., a parent's profile can be protected
+// without needing to PIN-gate every profile on the account. See
+// ProfileSelector.js for where switching into, editing, or deleting a
+// locked profile actually prompts for this.
+//
+// The PIN itself is never stored — only a salted SHA-256 hash, via the
+// browser's built-in Web Crypto API (no extra dependency), the same way
+// a real backend would never store a password in plaintext. This is
+// still not real security: anyone with access to this browser's dev
+// tools can read the hash straight out of localStorage and, with enough
+// effort, brute-force a 4-digit space against it. But it keeps a PIN
+// from being trivially human-readable at a glance the way a raw stored
+// value would be — worth doing even though AuthContext's own account
+// passwords, elsewhere in this app, don't yet get the same treatment.
+export const PIN_LENGTH = 4;
+
+function bufferToHex(buffer) {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function randomSaltHex() {
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  return bufferToHex(bytes.buffer);
+}
+
+async function hashPin(pin, salt) {
+  const data = new TextEncoder().encode(`${salt}:${pin}`);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return bufferToHex(digest);
+}
+
+function isValidPinFormat(pin) {
+  return typeof pin === 'string' && new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin);
+}
+
 // Generates an id that can't collide with an existing profile, even if
 // two profiles get created in the same millisecond. Existing ids are
 // collected into a Set up front (rather than calling `existing.some(...)`
@@ -132,7 +173,10 @@ export function ProfileProvider({ children }) {
   // Edits an existing profile's nickname, picture, and/or Kids flag in
   // one go — this backs the "Edit Profile" screen. Any field left
   // undefined keeps its current value, so callers can pass just the
-  // fields that changed.
+  // fields that changed. Deliberately doesn't touch pinHash/pinSalt —
+  // those are managed separately below (setProfilePin/removeProfilePin),
+  // since setting a PIN is async (hashing) and shouldn't be bundled into
+  // this otherwise-synchronous save.
   const updateProfile = useCallback(
     (id, { name, avatarId, isKids } = {}) => {
       const target = profiles.find((p) => p.id === id);
@@ -162,6 +206,54 @@ export function ProfileProvider({ children }) {
       return { success: true };
     },
     [profiles, persist]
+  );
+
+  // Sets (or replaces) the PIN a profile is locked behind. A fresh salt
+  // is generated every time — even when changing an existing PIN — so
+  // two profiles that happen to pick the same PIN never end up with the
+  // same stored hash either.
+  const setProfilePin = useCallback(
+    async (id, pin) => {
+      if (!isValidPinFormat(pin)) {
+        return { success: false, error: `PIN must be exactly ${PIN_LENGTH} digits.` };
+      }
+      const pinSalt = randomSaltHex();
+      const pinHash = await hashPin(pin, pinSalt);
+      const updated = profiles.map((p) => (p.id === id ? { ...p, pinSalt, pinHash } : p));
+      persist(updated);
+      return { success: true };
+    },
+    [profiles, persist]
+  );
+
+  // Unlocks a profile again — switching into it, editing it, or deleting
+  // it (see requestPinThenSelect/requestPinThenEdit/handleDeleteOne in
+  // ProfileSelector.js) no longer requires a PIN afterward.
+  const removeProfilePin = useCallback(
+    (id) => {
+      const updated = profiles.map((p) => {
+        if (p.id !== id) return p;
+        const { pinHash, pinSalt, ...rest } = p;
+        return rest;
+      });
+      persist(updated);
+    },
+    [profiles, persist]
+  );
+
+  // Checks a candidate PIN against the profile's stored hash. Returns
+  // `true` for a profile with no PIN set at all (nothing to unlock), so
+  // callers can run any profile through the same gate without first
+  // checking pinHash themselves.
+  const verifyProfilePin = useCallback(
+    async (id, pin) => {
+      const target = profiles.find((p) => p.id === id);
+      if (!target || !target.pinHash) return true;
+      if (!isValidPinFormat(pin)) return false;
+      const attemptHash = await hashPin(pin, target.pinSalt);
+      return attemptHash === target.pinHash;
+    },
+    [profiles]
   );
 
   // Deletes a single profile. If it was the active one, the active
@@ -198,6 +290,9 @@ export function ProfileProvider({ children }) {
         updateProfile,
         deleteProfile,
         deleteAllProfiles,
+        setProfilePin,
+        removeProfilePin,
+        verifyProfilePin,
       }}
     >
       {children}
