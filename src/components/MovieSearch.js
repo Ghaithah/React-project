@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { useProfiles } from "./ProfileContext";
+import { useAuth } from "./AuthContext";
 import { useWatchHistory } from "./WatchHistoryContext";
 import { useMyList } from "./MyListContext";
-import { useRatings } from "./RatingsContext";
+import { useRatings, RATINGS_KEY_PREFIX } from "./RatingsContext";
 import { useMovieCatalog } from "./MovieCatalogContext";
 import HeroBanner from "./HeroBanner";
 import MovieCard, { isRecentRelease } from "./MovieCard";
@@ -84,7 +85,6 @@ const BROWSE_QUERY_TERMS_KIDS = [
   "house", "home", "baby", "kid", "little", "big", "bunny", "duck",
   "penguin", "monkey", "elephant", "unicorn", "mermaid",
 ];
-
 // Cycled through after the term pool above wraps around once, paired
 // with `s=` to pull a genuinely different set of results for the same
 // term (OMDb's `y=` filters by release year server-side — it isn't a
@@ -170,7 +170,6 @@ const SIMILAR_POOL_IDS = [
   "tt0435761", // Toy Story 3
   "tt1049413", // Up
 ];
-
 // --- Curated trailer IDs (no live YouTube search needed) ---
 // A hand-verified imdbID -> YouTube video ID mapping covering exactly
 // the SIMILAR_POOL_IDS set above — the same ~38 well-known titles that
@@ -274,7 +273,6 @@ async function fetchJsonPool(urls, limit = FETCH_CONCURRENCY) {
   await Promise.all(workers);
   return results;
 }
-
 // --- Daily OMDb request counter ---
 // OMDb's free tier caps out at 1,000 requests/day and its responses
 // don't say how many are left, so the only way to know how close a
@@ -425,7 +423,6 @@ function setCachedDetail(imdbID, data) {
 
   persistDetailCacheStore();
 }
-
 // --- Persistent trailer-id cache (localStorage) ---
 // YouTube's search.list endpoint is the most expensive call this app
 // makes — 100 quota units per request against a free key's 10,000/day
@@ -654,7 +651,6 @@ function fetchYoutubeSearch(url) {
     });
   });
 }
-
 // --- Recent searches (search suggestions dropdown) ---
 // A small, per-browser list of the most recent committed search terms —
 // "committed" meaning the visitor pressed Enter or picked a suggestion,
@@ -828,8 +824,6 @@ function mergeDetailIntoMovie(movie, detail) {
     imdbRating: detail.imdbRating && detail.imdbRating !== "N/A" ? parseFloat(detail.imdbRating) : null,
   };
 }
-
-
 // --- Kids-profile content filtering ---
 // OMDb doesn't expose a simple "kid safe" flag, so this leans on two
 // signals as a practical proxy: genre, and the official content rating
@@ -991,6 +985,16 @@ const TASTE_LIST_WEIGHT = 1;
 // otherwise perfectly decent title.
 const MATCH_SCORE_FLOOR = 34;
 const MATCH_SCORE_CEILING = 98;
+// When both a genre-affinity signal AND a decade-affinity signal exist
+// for a title (see movieDecade()/tasteProfile below), the final score
+// blends them rather than picking just one — genre carries most of the
+// weight (it's the stronger, more specific signal: two Action fans can
+// have completely different favorite decades), decade adds a smaller
+// nudge on top. When only one signal is actually available for a title,
+// that one alone decides the score, unweighted, so a title still missing
+// Genre data (still enriching) isn't penalized for it.
+const MATCH_SCORE_GENRE_SHARE = 0.75;
+const MATCH_SCORE_DECADE_SHARE = 0.25;
 // How much a like/dislike nudges the base score once it's computed —
 // applied on TOP of the genre-affinity or rating-based base below, not
 // instead of it, so even a disliked title still shows some explanation
@@ -1002,6 +1006,77 @@ function movieGenres(movie) {
   return movie && movie.Genre
     ? movie.Genre.split(",").map((g) => g.trim()).filter(Boolean)
     : [];
+}
+
+// Buckets a title's release year into its decade (e.g. 1994 -> "1990s"),
+// the same bucketing StatsPage.js's own "Favorite Decade" tile uses —
+// reimplemented locally here rather than imported since the two
+// components don't otherwise share a module. Returns null for a title
+// with no parseable year (a still-loading search result, or a genuinely
+// missing OMDb field), so it's simply excluded from decade-based
+// scoring instead of getting lumped into a bogus "NaNs" bucket.
+function movieDecade(movie) {
+  const match = /\d{4}/.exec((movie && movie.Year) || "");
+  if (!match) return null;
+  const year = parseInt(match[0], 10);
+  const decade = Math.floor(year / 10) * 10;
+  return `${decade}s`;
+}
+
+// --- "Hidden Gems For You" row ---
+// A third personalization lens, alongside the seeded "Because You
+// Watched"/"Because You Liked" shelves and the Top 10/New Releases
+// rating-ranked shelves: rather than starting from one specific title
+// (the "Because..." rows) or from raw popularity (Top 10), this simply
+// asks "what does this profile's OWN taste profile predict a strong
+// match for, that isn't already the obvious blockbuster pick?" Capped to
+// a modest IMDb-rating band (HIDDEN_GEM_MAX_RATING) so it actually reads
+// as "an under-the-radar pick for you" rather than a second copy of Top
+// 10 Today with the same handful of universally-loved titles. Only
+// renders once this profile actually HAS a taste profile to predict
+// from (see the maxTasteWeight/maxDecadeWeight gate on the memo itself)
+// — with nothing rated/watched/saved yet there's no personalized signal
+// to base "hidden gem" on.
+const HIDDEN_GEMS_MATCH_THRESHOLD = 78;
+const HIDDEN_GEM_MAX_RATING = 7.6;
+const HIDDEN_GEMS_ROW_SIZE = 12;
+const MIN_HIDDEN_GEMS_ROW_SIZE = 6;
+
+// --- "Popular With Your Household" row ---
+// Every profile on this account rates/likes titles independently (see
+// RatingsContext.js) — but every profile on the same account shares the
+// same browser, which means this component can read every OTHER
+// profile's own liked-titles set directly out of localStorage (the
+// exact RATINGS_KEY_PREFIX key shape RatingsContext.js itself uses,
+// exported from there for this exact purpose) with no backend and no
+// new storage of its own. It's the closest thing this app has to a real
+// collaborative-filtering signal — what does someone ELSE in this
+// household already enjoy — layered on top of the single-profile taste
+// modeling everything else above is built from. Deliberately skipped
+// entirely in Kids mode (see the row's own gating further down): an
+// adult profile's likes have no business surfacing as a recommendation
+// to a Kids profile just because they happen to share a login.
+const HOUSEHOLD_ROW_SIZE = 12;
+const MIN_HOUSEHOLD_ROW_SIZE = 5;
+
+// Reads just the liked-imdbIDs out of another profile's own ratings
+// blob in localStorage — same key shape and JSON shape RatingsContext.js
+// itself reads/writes, just read directly here rather than through that
+// context (which only ever exposes the ACTIVE profile's own ratings, by
+// design). Never throws: a profile that's never rated anything, or any
+// parse failure, simply contributes an empty set.
+function readProfileLikedIds(user, profileId) {
+  if (!user || !profileId) return new Set();
+  try {
+    const raw = window.localStorage.getItem(
+      `${RATINGS_KEY_PREFIX}${user.toLowerCase()}_${profileId}`
+    );
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") return new Set();
+    return new Set(Object.keys(parsed).filter((id) => parsed[id] === "like"));
+  } catch {
+    return new Set();
+  }
 }
 
 // --- Auto-load cap (genre-filtered browsing AND text search) ---
@@ -1074,9 +1149,9 @@ const SORT_OPTIONS = [
   { value: "title_asc", label: "Title A–Z" },
   { value: "rating_desc", label: "Rating (high to low)" },
 ];
-
 export default function MovieSearch() {
-  const { activeProfile } = useProfiles();
+  const { activeProfile, profiles, activeProfileId } = useProfiles();
+  const { user } = useAuth();
   const { continueWatching, recordWatch, removeFromHistory, updateProgress, getProgress } = useWatchHistory();
   const { myList, isInList, toggleInList } = useMyList();
   const { getRating, toggleLike, toggleDislike, likedIds, dislikedIds } = useRatings();
@@ -1218,7 +1293,6 @@ export default function MovieSearch() {
   // what drive genreFilter/typeFilter/languageFilter, and this effect
   // must not fight them on re-renders.
   const appliedGenreParamRef = useRef(false);
-
 
   // Switching profiles mid-session (Kids <-> regular) should reset the
   // browse grid back to the start of whichever term pool now applies,
@@ -1415,7 +1489,6 @@ export default function MovieSearch() {
     return collected;
   }
 
-
   // Initial browse load: fires on mount and whenever kidsMode flips (the
   // reset effect above clears state first — effects run in declaration
   // order on the same commit, so this always sees the freshly-reset
@@ -1530,7 +1603,6 @@ export default function MovieSearch() {
         if (requestId === searchRequestId.current) setLoading(false);
       });
   }, [debouncedQuery]);
-
 
   useEffect(() => {
     const needsDetail = movies.filter((m) => m.Genre === null);
@@ -1727,31 +1799,49 @@ export default function MovieSearch() {
   // not full movie objects, so a liked title's genres have to be looked
   // up wherever they've already been loaded (continueWatching/myList
   // themselves, or the broader browse/similar/search pools).
+  //
+  // Alongside genre, a second affinity map tracks DECADE (see
+  // movieDecade() above) using the exact same weighting — a profile
+  // that's been bingeing 90s action doesn't just want "more Action," it
+  // specifically wants more 90s Action, and two titles that tie on
+  // genre overlap shouldn't score identically if one is from a decade
+  // this profile has never touched. getMatchScore below blends both
+  // signals rather than picking just one.
   const tasteProfile = useMemo(() => {
-    const weights = new Map();
-    function addGenres(movie, weight) {
-      movieGenres(movie).forEach((g) => weights.set(g, (weights.get(g) || 0) + weight));
+    const genreWeights = new Map();
+    const decadeWeights = new Map();
+    function addTaste(movie, weight) {
+      movieGenres(movie).forEach((g) => genreWeights.set(g, (genreWeights.get(g) || 0) + weight));
+      const decade = movieDecade(movie);
+      if (decade) decadeWeights.set(decade, (decadeWeights.get(decade) || 0) + weight);
     }
-    continueWatching.forEach((m) => addGenres(m, TASTE_WATCH_WEIGHT));
-    myList.forEach((m) => addGenres(m, TASTE_LIST_WEIGHT));
+    continueWatching.forEach((m) => addTaste(m, TASTE_WATCH_WEIGHT));
+    myList.forEach((m) => addTaste(m, TASTE_LIST_WEIGHT));
     if (likedIds.size > 0) {
       const seen = new Set();
       [...continueWatching, ...myList, ...browseMovies, ...similarPool, ...movies].forEach((m) => {
         if (m && m.imdbID && likedIds.has(m.imdbID) && !seen.has(m.imdbID)) {
           seen.add(m.imdbID);
-          addGenres(m, TASTE_LIKE_WEIGHT);
+          addTaste(m, TASTE_LIKE_WEIGHT);
         }
       });
     }
-    return weights;
+    return { genreWeights, decadeWeights };
   }, [continueWatching, myList, likedIds, browseMovies, similarPool, movies]);
 
-  // The taste profile's own strongest genre — used to normalize every
-  // title's raw weighted-genre-overlap sum onto the 0-1 scale that
-  // getMatchScore below maps onto MATCH_SCORE_FLOOR..MATCH_SCORE_CEILING.
+  // The taste profile's own strongest genre/decade — used to normalize
+  // every title's raw weighted overlap onto the 0-1 scale getMatchScore
+  // below maps onto MATCH_SCORE_FLOOR..MATCH_SCORE_CEILING.
   const maxTasteWeight = useMemo(() => {
     let max = 0;
-    tasteProfile.forEach((w) => {
+    tasteProfile.genreWeights.forEach((w) => {
+      if (w > max) max = w;
+    });
+    return max;
+  }, [tasteProfile]);
+  const maxDecadeWeight = useMemo(() => {
+    let max = 0;
+    tasteProfile.decadeWeights.forEach((w) => {
       if (w > max) max = w;
     });
     return max;
@@ -1759,11 +1849,13 @@ export default function MovieSearch() {
 
   // Resolves a single movie's "X% Match" percentage. Two modes:
   //  - Once this profile has SOME taste data (at least one watched/
-  //    listed/liked title with a genre), the score reflects how strongly
-  //    a title's own genres overlap with the taste profile above,
-  //    normalized against the profile's own strongest genre so a title
-  //    matching what this profile actually favors most reads close to
-  //    MATCH_SCORE_CEILING.
+  //    listed/liked title with a genre or a parseable year), the score
+  //    reflects how strongly a title's own genre AND decade overlap
+  //    with the taste profile above (blended per
+  //    MATCH_SCORE_GENRE_SHARE/MATCH_SCORE_DECADE_SHARE), each
+  //    normalized against this profile's own strongest genre/decade so
+  //    a title matching what this profile actually favors most reads
+  //    close to MATCH_SCORE_CEILING.
   //  - Before any taste data exists (a brand-new profile), there's
   //    nothing to compare against yet, so this falls back to OMDb's
   //    public rating as a reasonable stand-in — a title everyone rates
@@ -1777,12 +1869,25 @@ export default function MovieSearch() {
     (movie) => {
       if (!movie || !movie.imdbID) return null;
       const genres = movieGenres(movie);
+      const decade = movieDecade(movie);
+
+      const hasGenreSignal = maxTasteWeight > 0 && genres.length > 0;
+      const hasDecadeSignal = maxDecadeWeight > 0 && !!decade;
 
       let base;
-      if (maxTasteWeight > 0 && genres.length > 0) {
-        const sum = genres.reduce((acc, g) => acc + (tasteProfile.get(g) || 0), 0);
-        const avgWeight = sum / genres.length;
-        const normalized = Math.min(1, avgWeight / maxTasteWeight);
+      if (hasGenreSignal || hasDecadeSignal) {
+        let normalized = 0;
+        if (hasGenreSignal) {
+          const sum = genres.reduce((acc, g) => acc + (tasteProfile.genreWeights.get(g) || 0), 0);
+          const avgWeight = sum / genres.length;
+          const genreNormalized = Math.min(1, avgWeight / maxTasteWeight);
+          normalized += genreNormalized * (hasDecadeSignal ? MATCH_SCORE_GENRE_SHARE : 1);
+        }
+        if (hasDecadeSignal) {
+          const decadeWeight = tasteProfile.decadeWeights.get(decade) || 0;
+          const decadeNormalized = Math.min(1, decadeWeight / maxDecadeWeight);
+          normalized += decadeNormalized * (hasGenreSignal ? MATCH_SCORE_DECADE_SHARE : 1);
+        }
         base = MATCH_SCORE_FLOOR + normalized * (MATCH_SCORE_CEILING - MATCH_SCORE_FLOOR);
       } else if (movie.imdbRating != null) {
         // OMDb ratings run roughly 1-9.5 in practice — map that onto the
@@ -1790,7 +1895,7 @@ export default function MovieSearch() {
         const normalized = Math.min(1, Math.max(0, (movie.imdbRating - 3) / 6));
         base = MATCH_SCORE_FLOOR + normalized * (MATCH_SCORE_CEILING - MATCH_SCORE_FLOOR);
       } else {
-        base = 60; // no genre data and no rating yet (still enriching) — a neutral placeholder
+        base = 60; // no genre/decade data and no rating yet (still enriching) — a neutral placeholder
       }
 
       if (likedIds.has(movie.imdbID)) base += MATCH_SCORE_LIKE_BONUS;
@@ -1798,7 +1903,7 @@ export default function MovieSearch() {
 
       return Math.round(Math.min(MATCH_SCORE_CEILING, Math.max(20, base)));
     },
-    [tasteProfile, maxTasteWeight, likedIds, dislikedIds]
+    [tasteProfile, maxTasteWeight, maxDecadeWeight, likedIds, dislikedIds]
   );
 
   // --- Derived: Top 10 Today ---
@@ -1873,6 +1978,93 @@ export default function MovieSearch() {
     });
     return list.length >= MIN_NEW_RELEASES_ROW_SIZE ? list.slice(0, NEW_RELEASES_ROW_SIZE) : [];
   }, [browseMovies, similarPool, kidsMode, dislikedIds, typeFilter]);
+
+  // --- Derived: "Hidden Gems For You" ---
+  // See the constant block near the top of this file for the reasoning.
+  // Same candidate pooling as topTrending/newReleases above, but ranked
+  // by THIS profile's own predicted match score (getMatchScore, defined
+  // just above) rather than by raw IMDb rating, and capped to a modest
+  // rating band so it surfaces something other than the same handful of
+  // universally-loved titles every other row already leads with. Titles
+  // already liked or disliked are excluded — the point is discovery, not
+  // re-surfacing something already rated.
+  const hiddenGems = useMemo(() => {
+    if (maxTasteWeight === 0 && maxDecadeWeight === 0) return []; // nothing to predict from yet
+    const pool = kidsMode ? browseMovies : [...browseMovies, ...similarPool];
+    const candidates = new Map();
+    pool.forEach((m) => {
+      if (!m || !m.imdbID || candidates.has(m.imdbID)) return;
+      if (!m.Genre) return; // no genre data yet — match score would just be a placeholder
+      if (kidsMode && !isKidSafe(m)) return;
+      if (typeFilter && m.Type !== typeFilter) return;
+      if (dislikedIds.has(m.imdbID) || likedIds.has(m.imdbID)) return;
+      if (m.imdbRating == null || m.imdbRating > HIDDEN_GEM_MAX_RATING) return;
+      candidates.set(m.imdbID, m);
+    });
+
+    const scored = Array.from(candidates.values())
+      .map((m) => ({ movie: m, score: getMatchScore(m) || 0 }))
+      .filter((s) => s.score >= HIDDEN_GEMS_MATCH_THRESHOLD)
+      .sort((a, b) => b.score - a.score || (b.movie.imdbRating ?? -1) - (a.movie.imdbRating ?? -1));
+
+    return scored.length >= MIN_HIDDEN_GEMS_ROW_SIZE
+      ? scored.slice(0, HIDDEN_GEMS_ROW_SIZE).map((s) => s.movie)
+      : [];
+  }, [
+    maxTasteWeight,
+    maxDecadeWeight,
+    browseMovies,
+    similarPool,
+    kidsMode,
+    typeFilter,
+    dislikedIds,
+    likedIds,
+    getMatchScore,
+  ]);
+
+  // --- Derived: "Popular With Your Household" ---
+  // See the constant block near the top of this file for the reasoning.
+  // Reads every OTHER profile's liked titles straight out of
+  // localStorage (readProfileLikedIds, defined above), counts how many
+  // distinct other profiles liked each one, and ranks by that count
+  // (IMDb rating as the tiebreaker) — a title two housemates both liked
+  // outranks one only a single person did. Restricted to titles already
+  // sitting in this session's own loaded pools (browseMovies/
+  // similarPool/movies) since that's the only data this component has
+  // enough of (Genre/Poster/imdbRating) to render a real MovieCard from
+  // — RatingsContext itself only ever stores bare imdbIDs, never full
+  // title objects.
+  const householdRow = useMemo(() => {
+    if (kidsMode || !user || profiles.length < 2) return [];
+
+    const otherProfileIds = profiles.filter((p) => p.id !== activeProfileId).map((p) => p.id);
+    if (otherProfileIds.length === 0) return [];
+
+    const likeCounts = new Map(); // imdbID -> number of OTHER profiles who liked it
+    otherProfileIds.forEach((pid) => {
+      readProfileLikedIds(user, pid).forEach((id) => {
+        likeCounts.set(id, (likeCounts.get(id) || 0) + 1);
+      });
+    });
+    if (likeCounts.size === 0) return [];
+
+    const pool = new Map();
+    [...browseMovies, ...similarPool, ...movies].forEach((m) => {
+      if (!m || !m.imdbID || pool.has(m.imdbID)) return;
+      if (!likeCounts.has(m.imdbID)) return;
+      if (typeFilter && m.Type !== typeFilter) return;
+      if (dislikedIds.has(m.imdbID)) return; // this profile already said no
+      pool.set(m.imdbID, m);
+    });
+
+    const ranked = Array.from(pool.values()).sort((a, b) => {
+      const countDiff = (likeCounts.get(b.imdbID) || 0) - (likeCounts.get(a.imdbID) || 0);
+      if (countDiff !== 0) return countDiff;
+      return (b.imdbRating ?? -1) - (a.imdbRating ?? -1);
+    });
+
+    return ranked.length >= MIN_HOUSEHOLD_ROW_SIZE ? ranked.slice(0, HOUSEHOLD_ROW_SIZE) : [];
+  }, [kidsMode, user, profiles, activeProfileId, browseMovies, similarPool, movies, typeFilter, dislikedIds]);
 
   // --- Derived: "Because You Watched" personalized rows ---
   // Builds one recommendation shelf per recently-opened Continue Watching
@@ -2389,7 +2581,6 @@ export default function MovieSearch() {
     observer.observe(node);
     return () => observer.disconnect();
   }, [hasMore]);
-
 
   // Clicking a movie card previews it in the hero banner up top, so scroll
   // the page back to the top to bring that banner into view. Skipped when
@@ -3628,6 +3819,35 @@ export default function MovieSearch() {
         </div>
       )}
 
+      {/* "Popular With Your Household" — see the constant block and the
+          householdRow memo above for the reasoning. A cross-profile
+          signal, so it's placed alongside the other broad (non-seeded)
+          personalization rows rather than among the single-title
+          "Because You..." shelves below. */}
+      {!searched && !activeLoading && householdRow.length > 0 && (
+        <div className="movie-search__row-section">
+          <h2 className="movie-search__section-title">Popular With Your Household</h2>
+          <ScrollableRow trackClassName="movie-search__row-track" ariaLabel="Popular With Your Household">
+            {householdRow.map((movie) => (
+              <MovieCard
+                key={movie.imdbID}
+                movie={movie}
+                variant="row"
+                onSelect={previewMovie}
+                onPlay={openMovie}
+                resolveTrailerId={resolveTrailerId}
+                isInList={isInList(movie.imdbID)}
+                onToggleList={toggleInList}
+                myRating={getRating(movie.imdbID)}
+                onLike={toggleLike}
+                onDislike={toggleDislike}
+                matchScore={getMatchScore(movie)}
+              />
+            ))}
+          </ScrollableRow>
+        </div>
+      )}
+
       {!searched && !activeLoading &&
         becauseYouWatchedRows.map((row) => (
           <div className="movie-search__row-section" key={row.seedId}>
@@ -3677,6 +3897,35 @@ export default function MovieSearch() {
             </ScrollableRow>
           </div>
         ))}
+
+      {/* "Hidden Gems For You" — see the constant block and the
+          hiddenGems memo above. Placed after the seeded "Because You..."
+          rows and before Top 10 Today: it's a broader personalization
+          signal than a single-title seed, but still specifically about
+          this profile's own taste rather than raw popularity. */}
+      {!searched && !activeLoading && hiddenGems.length > 0 && (
+        <div className="movie-search__row-section">
+          <h2 className="movie-search__section-title">Hidden Gems For You</h2>
+          <ScrollableRow trackClassName="movie-search__row-track" ariaLabel="Hidden Gems For You">
+            {hiddenGems.map((movie) => (
+              <MovieCard
+                key={movie.imdbID}
+                movie={movie}
+                variant="row"
+                onSelect={previewMovie}
+                onPlay={openMovie}
+                resolveTrailerId={resolveTrailerId}
+                isInList={isInList(movie.imdbID)}
+                onToggleList={toggleInList}
+                myRating={getRating(movie.imdbID)}
+                onLike={toggleLike}
+                onDislike={toggleDislike}
+                matchScore={getMatchScore(movie)}
+              />
+            ))}
+          </ScrollableRow>
+        </div>
+      )}
 
       {!searched && !activeLoading && topTrending.length > 0 && (
         <div className="movie-search__trending">

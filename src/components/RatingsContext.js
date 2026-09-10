@@ -9,7 +9,15 @@ const RatingsContext = createContext(null);
 // (MyListContext.js) and Continue Watching (WatchHistoryContext.js) — a
 // Kids profile and an adult profile sharing one login keep entirely
 // separate opinions about the same title.
-const RATINGS_KEY_PREFIX = 'movieapp_ratings_';
+//
+// Exported (not just used internally) so MovieSearch.js's "Popular With
+// Your Household" row can read every OTHER profile's own liked-titles
+// set directly out of localStorage, using this exact same key shape,
+// without needing a second copy of it to drift out of sync with this
+// one. See that row's own comment in MovieSearch.js for why that's safe
+// to do without a backend: every profile on an account shares the same
+// browser's localStorage.
+export const RATINGS_KEY_PREFIX = 'movieapp_ratings_';
 
 // Same reasoning as MyListContext's MAX_ENTRIES: a generous ceiling, not
 // a realistic one, just so an enthusiastic visitor can't grow
