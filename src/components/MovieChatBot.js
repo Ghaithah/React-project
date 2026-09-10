@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMovieCatalog } from "./MovieCatalogContext";
-import { fetchOmdb } from "./MovieSearch";
+import { useRatings } from "./RatingsContext";
+import { fetchOmdb, isKidSafe } from "./MovieSearch";
 import "./MovieChatBot.css";
 
 // =============================================================================
@@ -24,8 +26,8 @@ import "./MovieChatBot.css";
 //      catalog, or anything unrelated to movies/TV, gets politely
 //      declined and redirected instead of answered from Gemini's own
 //      general knowledge. It's also told to ignore attempts to override
-//      these instructions (\"ignore previous instructions\", \"pretend
-//      you're ...\", etc.). This is the real guardrail: a model reasoning
+//      these instructions ("ignore previous instructions", "pretend
+//      you're ...", etc.). This is the real guardrail: a model reasoning
 //      about intent and scope handles rephrasing and edge cases far
 //      better than keyword matching ever could.
 //   2. isMovieRelated()/generateReply() further down are the ORIGINAL
@@ -40,7 +42,7 @@ import "./MovieChatBot.css";
 //
 // --- Reliability: retries + model fallback ---
 // A live Gemini call can fail for reasons that have nothing to do with
-// your key or code — most commonly HTTP 503 (\"the model is overloaded\")
+// your key or code — most commonly HTTP 503 ("the model is overloaded")
 // or 429 (rate limited) when a model is under heavy demand. callGemini()
 // retries those a couple of times with backoff, then falls through
 // GEMINI_MODEL_FALLBACKS before finally giving up and triggering the
@@ -48,7 +50,7 @@ import "./MovieChatBot.css";
 // strategy.
 //
 // --- Truncated replies: thinking tokens vs maxOutputTokens ---
-// Gemini's 2.5/3.x \"flash\" models reason silently before answering, and
+// Gemini's 2.5/3.x "flash" models reason silently before answering, and
 // those thinking tokens are drawn from the same maxOutputTokens budget as
 // the visible reply — with a small budget the model can spend it all
 // thinking and get cut off mid-word on the actual answer. The request in
@@ -63,6 +65,23 @@ import "./MovieChatBot.css";
 // customers would normally add a second, server-side check (e.g. a
 // moderation API call) that a client can't bypass by tampering with
 // the request.
+//
+// --- "Surprise Me" wizard ---
+// Alongside the free-text Gemini/offline chat above, the widget also
+// runs a small, fully LOCAL 3-question wizard (mood -> time -> genre,
+// see the constants and chooseMood/chooseTime/chooseGenre/revealPick
+// functions further down) that ends by picking an actual title from the
+// catalog and offering to open it. This never touches Gemini at all —
+// it's plain client-side filtering + a weighted-random pick over
+// MovieCatalogContext's own catalog.allLoaded, the same data the
+// catalog-grounding above already uses — so it works identically with
+// or without a configured API key, costs zero quota, and answers
+// instantly rather than waiting on a network round trip. It's a
+// deliberately different code path from the chat/Gemini flow above
+// rather than another guardrailed prompt: a decision-maker ("just pick
+// something for me") is a different job than a Q&A assistant, and
+// doing it as plain filtering is both more reliable (no model can
+// hallucinate a title that isn't actually in the catalog) and instant.
 // =============================================================================
 
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
@@ -78,7 +97,7 @@ const GEMINI_MODEL = process.env.REACT_APP_GEMINI_MODEL || "gemini-3.5-flash";
 // the offline fallback. Skipped if GEMINI_MODEL already names one of them.
 // Verified against the actual ListModels response for this project's key
 // (generativelanguage.googleapis.com/v1beta/models) rather than guessed
-// from docs — \"gemini-2.5-flash\" and \"gemini-2.0-flash\" were tried here
+// from docs — "gemini-2.5-flash" and "gemini-2.0-flash" were tried here
 // first and both came back a hard 404 for this key (2.0-flash doesn't
 // exist in the catalog at all anymore; 2.5-flash is catalog-listed but
 // evidently not enabled for this particular key/project), which is a
@@ -92,7 +111,7 @@ const GEMINI_MODEL = process.env.REACT_APP_GEMINI_MODEL || "gemini-3.5-flash";
 // this list doesn't go stale the same way the old one did as models get
 // deprecated over time.
 const GEMINI_MODEL_FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"];
-// 503 (\"model overloaded\") and 429 (\"rate limited\") are both retryable,
+// 503 ("model overloaded") and 429 ("rate limited") are both retryable,
 // but not the same kind of problem, so they don't get the same
 // treatment: an overload is often gone within a second, so it's worth a
 // couple of quick retries on the SAME model. A 429 usually means a
@@ -158,7 +177,7 @@ const EXAMPLE_PROMPTS = [
 
 // Renders the currently loaded/visible catalog (see MovieCatalogContext)
 // into a compact block of text Gemini can ground answers in, e.g. for
-// \"best movies of 2022\" or \"what's on screen right now\" questions. This
+// "best movies of 2022" or "what's on screen right now" questions. This
 // is also the FULL extent of what Gemini is allowed to talk about — see
 // buildSystemInstruction below.
 function buildCatalogSummary(catalog) {
@@ -197,7 +216,7 @@ function buildCatalogSummary(catalog) {
 // SESSION has already loaded — browsed, searched, or the fixed
 // similar-titles pool (see MovieSearch.js). Most of OMDb's real catalog
 // was never in it to begin with, so a visitor asking about a title
-// nobody happened to search for yet always got a false \"not available,\"
+// nobody happened to search for yet always got a false "not available,"
 // even though typing that exact title into the site's own search box
 // would find it immediately. This closes that gap on every chat turn,
 // not just when the visitor has already searched for the title
@@ -210,7 +229,7 @@ function buildCatalogSummary(catalog) {
 //
 // Entirely best-effort and never blocks the main reply: any failure (no
 // OMDb key configured, network error, nothing recognizable to extract —
-// e.g. \"recommend a comedy\" has no title to look up) just skips the
+// e.g. "recommend a comedy" has no title to look up) just skips the
 // live check for this turn and answers from catalog context alone,
 // exactly like before this feature existed.
 //
@@ -218,7 +237,7 @@ function buildCatalogSummary(catalog) {
 // asked Gemini to extract the title, which doubled how many Gemini
 // requests a single chat message made — and free-tier Gemini keys carry
 // a fairly low per-minute request cap, so that doubling made the
-// \"overloaded\"/rate-limited failures the retry logic above exists to
+// "overloaded"/rate-limited failures the retry logic above exists to
 // paper over noticeably MORE likely, not less (a burst of a few
 // messages could exhaust the retries on every model and drop straight
 // to the offline fallback). A plain regex strip has no such cost, and
@@ -227,7 +246,7 @@ function buildCatalogSummary(catalog) {
 const LIVE_LOOKUP_MAX_MATCHES = 5;
 
 // Leading phrasing stripped (repeatedly, since removing one can reveal
-// another — e.g. \"again, is X available?\" needs two passes) to leave the
+// another — e.g. "again, is X available?" needs two passes) to leave the
 // title-plus-question-tail as the working text.
 const TITLE_QUERY_LEADING_PATTERNS = [
   /^(again|so|ok(ay)?|hey|well)[,.]?\s+/i,
@@ -240,12 +259,12 @@ const TITLE_QUERY_LEADING_PATTERNS = [
 // availability/lookup question begins. Matched WHEREVER it first occurs
 // in the remaining text (not just as a clean trailing suffix), and
 // everything from that point on is cut — this is the fix for phrasings
-// like \"What about Warrior? Is it available?\", where the question tail
-// (\"Is it available?\") lands in the MIDDLE of the string once \"What
-// about \" is stripped from the front. A trailing-only pattern would strip
-// \"available?\" off the end but strand \"Is it\" in front of it, mangling
-// the query into \"Warrior? Is it\". Cutting at the first trigger removes
-// \"Is it available?\" in one go, regardless of where it sits.
+// like "What about Warrior? Is it available?", where the question tail
+// ("Is it available?") lands in the MIDDLE of the string once "What
+// about " is stripped from the front. A trailing-only pattern would strip
+// "available?" off the end but strand "Is it" in front of it, mangling
+// the query into "Warrior? Is it". Cutting at the first trigger removes
+// "Is it available?" in one go, regardless of where it sits.
 const TITLE_QUERY_TAIL_TRIGGER = new RegExp(
   "\\b(" +
     [
@@ -301,8 +320,8 @@ function extractTitleQueryHeuristic(userText) {
   // to nothing, or a bare pronoun) — not worth an OMDb request.
   if (text.length < 2 || /^(it|that|this|one|something|anything)$/i.test(text)) return null;
 
-  // A general question (\"what's on the page right now?\", \"how do I
-  // search?\") rather than a title lookup — don't guess.
+  // A general question ("what's on the page right now?", "how do I
+  // search?") rather than a title lookup — don't guess.
   if (TITLE_QUERY_WH_WORD.test(text)) return null;
 
   // Still has a stray question word in it somewhere — extraction didn't
@@ -313,7 +332,7 @@ function extractTitleQueryHeuristic(userText) {
 }
 
 // Loosely normalizes a title for matching (case, leading article,
-// punctuation) so \"The Vampire Diaries\" and \"vampire diaries\" compare
+// punctuation) so "The Vampire Diaries" and "vampire diaries" compare
 // equal.
 function normalizeTitleForMatch(title) {
   return (title || "")
@@ -344,7 +363,7 @@ function catalogContainsTitle(catalog, title) {
 
 // Searches OMDb directly for the extracted title — the exact same `s=`
 // search MovieSearch.js's own search box uses (via the shared,
-// quota-tracked fetchOmdb import above), so \"is it available\" gets a
+// quota-tracked fetchOmdb import above), so "is it available" gets a
 // real, live answer instead of only ever consulting whatever this
 // session already happened to load.
 async function searchOmdbLive(title) {
@@ -369,15 +388,15 @@ async function searchOmdbLive(title) {
 }
 
 // Runs the two-step lookup above and normalizes every failure/no-op path
-// to `null`, so callers never need to distinguish \"nothing to look up\"
-// from \"the lookup itself broke\" — both just mean \"no live data this
-// turn.\"
+// to `null`, so callers never need to distinguish "nothing to look up"
+// from "the lookup itself broke" — both just mean "no live data this
+// turn."
 //
 // Skips the live OMDb search entirely when the extracted title already
 // matches something in `catalog` (loaded or visible) — that's already
 // authoritative on its own (see buildCatalogSummary), so there's nothing
 // for a live search to add, and skipping removes any chance that an
-// imperfectly-extracted query comes back \"not found\" and gets weighed
+// imperfectly-extracted query comes back "not found" and gets weighed
 // against a title that's plainly already there. This is belt-and-braces
 // with buildSystemInstruction's rule that a catalog-context match always
 // wins — this stops the conflicting signal from being generated at all.
@@ -398,7 +417,7 @@ async function performLiveCatalogLookup(userText, catalog) {
 // visitor's current message (or null if there was nothing to look up, or
 // the lookup failed/was skipped) — see that function's comment above for
 // why it exists. When present, it's a live, authoritative answer to
-// \"does this exact title exist on the site,\" independent of whatever the
+// "does this exact title exist on the site," independent of whatever the
 // static CATALOG CONTEXT below happens to already contain.
 function buildSystemInstruction(catalog, liveLookup) {
   const liveLookupBlock = !liveLookup
@@ -481,7 +500,7 @@ async function callGeminiOnce(model, contents, systemInstructionText) {
       contents,
       generationConfig: {
         temperature: 0.6,
-        // 2.5/3.x \"flash\" models think before answering, and those
+        // 2.5/3.x "flash" models think before answering, and those
         // thinking tokens are drawn from the SAME maxOutputTokens budget
         // as the visible reply — at 400 tokens the model could spend the
         // whole budget thinking and get cut off mid-sentence on the
@@ -586,7 +605,7 @@ async function callGemini(historyMessages, catalog) {
 // above, but keeps the chatbot answering something reasonable instead of
 // going silent. It was already catalog-only (generateReply only ever
 // reads from catalog.allLoaded/catalog.visible), so it already matches
-// the \"site content only\" rule Gemini now follows too. ---
+// the "site content only" rule Gemini now follows too. ---
 
 const MOVIE_KEYWORDS = [
   "movie", "movies", "film", "films", "show", "shows", "series", "watch",
@@ -720,6 +739,100 @@ function offlineReply(userText, catalog) {
   return isMovieRelated(userText, catalog) ? generateReply(userText, catalog) : OFF_TOPIC_REPLY;
 }
 
+// =============================================================================
+// "Surprise Me" wizard
+// =============================================================================
+// A short, three-question flow (mood → time → reveal) that hands back one
+// specific pick, with a poster card and a "Watch This" button that deep
+// links straight into the trailer. Deliberately NOT a Gemini call:
+//   - Instant — no network round trip, no "thinking…" wait for something
+//     this simple.
+//   - Zero quota cost — doesn't compete with real chat questions against
+//     the same rate-limited API key (see RETRY_CONFIG's comment above for
+//     just how easy that limit is to hit).
+//   - Can't hallucinate a title — it only ever picks from
+//     catalog.allLoaded, the exact same pool buildCatalogSummary grounds
+//     the real chatbot in, so "Watch This" always opens a real title that
+//     was actually on the page.
+//
+// The whole flow is driven by plain closures rather than a separate
+// "wizard stage" piece of state: each step's bot message carries its own
+// `chips` (the buttons to show), and each chip carries an `onSelect`
+// closure that already has the answers-so-far (mood, then mood + time)
+// baked in from the function argument that produced it. Clicking a chip
+// just calls that closure directly — there's nothing elsewhere in the
+// component tracking "what step are we on," so there's nothing that can
+// drift out of sync with what's actually on screen. See the message
+// rendering below: chips only ever render on the LAST message in the
+// list, so once a step is answered and a new message is appended, the
+// old (now-stale) chips simply stop rendering — no explicit reset needed.
+const MOOD_OPTIONS = [
+  { id: "happy", label: "😊 Happy & Upbeat", genres: ["Comedy", "Animation", "Family", "Musical"] },
+  { id: "intense", label: "😬 On the Edge of My Seat", genres: ["Thriller", "Horror", "Mystery", "Crime"] },
+  { id: "cozy", label: "🥰 Cozy & Feel-Good", genres: ["Romance", "Family", "Drama"] },
+  { id: "mindbend", label: "🤯 Something Mind-Bending", genres: ["Sci-Fi", "Fantasy", "Mystery"] },
+  { id: "epic", label: "⚔️ Big Epic Adventure", genres: ["Action", "Adventure", "War"] },
+];
+
+// OMDb's search results don't include Runtime (that only arrives with a
+// per-title detail fetch this wizard deliberately avoids, to stay
+// instant), so "how much time do you have" leans on the one time-shaped
+// signal every loaded title already has: OMDb's own Type field. It's a
+// coarser proxy than actual minutes, but "movie" vs "series" is
+// genuinely what "quick one" vs "hours to burn" usually means anyway.
+const TIME_OPTIONS = [
+  { id: "quick", label: "⏱️ Just a quick one", preferType: "movie" },
+  { id: "binge", label: "📺 I've got hours to burn", preferType: "series" },
+  { id: "any", label: "🤷 Doesn't matter", preferType: null },
+];
+
+// Same weighted-random shape as MovieSearch.js's own shuffle (weight
+// biased toward stronger matches, never a flat random pick), just scored
+// against the chosen mood's genre list instead of a taste profile.
+function moodWeight(movie, mood) {
+  let weight = 1;
+  if (mood && movie.Genre) {
+    const genres = movie.Genre.split(",").map((g) => g.trim());
+    const overlap = genres.filter((g) => mood.genres.includes(g)).length;
+    weight += overlap * 3;
+  }
+  const rating = parseFloat(movie.imdbRating);
+  if (!Number.isNaN(rating)) weight += rating / 2;
+  return weight;
+}
+
+function weightedRandomPick(items, weightFn) {
+  const weights = items.map((item) => Math.max(weightFn(item), 0.0001));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  let roll = Math.random() * total;
+  for (let i = 0; i < items.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return items[i];
+  }
+  return items[items.length - 1];
+}
+
+// Builds the candidate pool for one reveal: kid-safety filtered (reusing
+// MovieSearch's own isKidSafe rather than a second copy of that
+// allowlist — see this file's import comment), with `excludeIds` left
+// out (already-rated titles plus anything already shown this wizard
+// session — see revealPick below), and soft-filtered toward the chosen
+// time commitment. "Soft" because an empty result would otherwise dead-end
+// the wizard on a thin catalog (e.g. no series loaded yet for "I've got
+// hours to burn") — falling back to the untyped pool beats showing
+// nothing.
+function buildSurpriseCandidates(catalog, mood, time, excludeIds) {
+  const pool = catalog.allLoaded.filter((m) => {
+    if (!m || !m.imdbID || excludeIds.has(m.imdbID)) return false;
+    if (catalog.kidsMode && !isKidSafe(m)) return false;
+    return true;
+  });
+  if (pool.length === 0) return [];
+  const typeFiltered =
+    time && time.preferType ? pool.filter((m) => m.Type === time.preferType) : pool;
+  return typeFiltered.length > 0 ? typeFiltered : pool;
+}
+
 // How much breathing room to leave between the toggle button and the
 // footer's top edge once the footer scrolls into view — purely visual,
 // so the button doesn't sit flush against the footer's border.
@@ -727,11 +840,18 @@ const FOOTER_GAP_PX = 16;
 
 export default function MovieChatbot() {
   const { catalog } = useMovieCatalog();
+  const navigate = useNavigate();
+  const { likedIds, dislikedIds } = useRatings();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const listRef = useRef(null);
+
+  // Titles already surfaced by THIS wizard run, so "Give Me Another"
+  // never repeats itself back-to-back. Reset at the start of each new
+  // run (see startSurprise) rather than ever growing unbounded.
+  const wizardShownIdsRef = useRef(new Set());
 
   // A ref mirror of `catalog` so respond() (below) always reads the
   // latest on-screen data without needing to be recreated every time
@@ -834,6 +954,102 @@ export default function MovieChatbot() {
     sendMessage(inputValue);
   }
 
+  // --- Surprise Me wizard handlers — see the design comment above
+  // MOOD_OPTIONS for why this is closures-all-the-way-down instead of a
+  // separate step/stage state variable. ---
+
+  function startSurprise() {
+    if (isTyping || catalog.allLoaded.length === 0) return;
+    wizardShownIdsRef.current = new Set();
+    setIsOpen(true);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: "🎲 Surprise Me" },
+      {
+        role: "bot",
+        text: "Let's find you something good — what kind of mood are you in?",
+        chips: MOOD_OPTIONS.map((mood) => ({
+          id: mood.id,
+          label: mood.label,
+          onSelect: () => chooseMood(mood),
+        })),
+      },
+    ]);
+  }
+
+  function chooseMood(mood) {
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: mood.label },
+      {
+        role: "bot",
+        text: "Got it. How much time do you have?",
+        chips: TIME_OPTIONS.map((time) => ({
+          id: time.id,
+          label: time.label,
+          onSelect: () => chooseTime(mood, time),
+        })),
+      },
+    ]);
+  }
+
+  function chooseTime(mood, time) {
+    setMessages((prev) => [...prev, { role: "user", text: time.label }]);
+    revealPick(mood, time);
+  }
+
+  function revealPick(mood, time) {
+    const currentCatalog = catalogRef.current;
+    const excludeIds = new Set([...likedIds, ...dislikedIds, ...wizardShownIdsRef.current]);
+    let pool = buildSurpriseCandidates(currentCatalog, mood, time, excludeIds);
+    // Relax the exclusion (but keep it from repeating a pick already
+    // shown THIS run) if the strict pool — nothing already rated —
+    // comes up empty, rather than dead-ending the wizard.
+    if (pool.length === 0) {
+      pool = buildSurpriseCandidates(currentCatalog, mood, time, wizardShownIdsRef.current);
+    }
+
+    if (pool.length === 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "bot",
+          text: "I don't have enough loaded yet to find a fresh match for that — try browsing a bit more first, or just ask me for a recommendation instead.",
+        },
+      ]);
+      return;
+    }
+
+    const pick = weightedRandomPick(pool, (m) => moodWeight(m, mood));
+    wizardShownIdsRef.current.add(pick.imdbID);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "bot",
+        text: "How about this?",
+        pick,
+        chips: [
+          { id: "watch", label: "▶️ Watch This", onSelect: () => watchPick(pick) },
+          { id: "again", label: "🔀 Give Me Another", onSelect: () => revealPick(mood, time) },
+          { id: "done", label: "Done for now", onSelect: () => finishWizard() },
+        ],
+      },
+    ]);
+  }
+
+  function watchPick(movie) {
+    setIsOpen(false);
+    navigate(`/?movie=${encodeURIComponent(movie.imdbID)}`);
+  }
+
+  function finishWizard() {
+    setMessages((prev) => [
+      ...prev,
+      { role: "bot", text: "Enjoy! Click the 🎲 anytime you want another pick." },
+    ]);
+  }
+
   return (
     <div className="movie-chatbot" style={{ "--chatbot-footer-lift": `${footerLift}px` }}>
       {isOpen && (
@@ -843,30 +1059,98 @@ export default function MovieChatbot() {
               <span className="movie-chatbot__header-icon" aria-hidden="true">🎬</span>
               Movie Assistant
             </div>
-            <button
-              type="button"
-              className="movie-chatbot__close"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close chat"
-            >
-              ✕
-            </button>
+            <div className="movie-chatbot__header-actions">
+              <button
+                type="button"
+                className="movie-chatbot__surprise-btn"
+                onClick={startSurprise}
+                disabled={isTyping || catalog.allLoaded.length === 0}
+                title="Surprise me with a pick"
+                aria-label="Surprise me with a pick"
+              >
+                🎲
+              </button>
+              <button
+                type="button"
+                className="movie-chatbot__close"
+                onClick={() => setIsOpen(false)}
+                aria-label="Close chat"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="movie-chatbot__messages" ref={listRef}>
             {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`movie-chatbot__message movie-chatbot__message--${m.role}`}
-              >
-                {m.text.split("\n").map((line, j) =>
-                  line ? <p key={j}>{line}</p> : <br key={j} />
+              <Fragment key={i}>
+                <div
+                  className={`movie-chatbot__message movie-chatbot__message--${m.role}${
+                    m.pick ? " movie-chatbot__message--pick" : ""
+                  }`}
+                >
+                  {m.pick ? (
+                    <>
+                      {m.text && <p className="movie-chatbot__pick-lead">{m.text}</p>}
+                      <div className="movie-chatbot__pick">
+                        {m.pick.Poster && m.pick.Poster !== "N/A" ? (
+                          <img
+                            className="movie-chatbot__pick-poster"
+                            src={m.pick.Poster}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="movie-chatbot__pick-poster movie-chatbot__pick-poster--placeholder" aria-hidden="true" />
+                        )}
+                        <div className="movie-chatbot__pick-info">
+                          <p className="movie-chatbot__pick-title">{m.pick.Title}</p>
+                          <p className="movie-chatbot__pick-meta">
+                            {[m.pick.Year, m.pick.Genre, m.pick.imdbRating ? `★ ${m.pick.imdbRating}` : null]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    m.text.split("\n").map((line, j) =>
+                      line ? <p key={j}>{line}</p> : <br key={j} />
+                    )
+                  )}
+                </div>
+
+                {i === messages.length - 1 && !isTyping && m.chips && m.chips.length > 0 && (
+                  <div className="movie-chatbot__message-chips">
+                    {m.chips.map((chip) => (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        className="movie-chatbot__suggestion-chip"
+                        onClick={chip.onSelect}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </div>
+              </Fragment>
             ))}
 
             {messages.length === 1 && !isTyping && (
               <div className="movie-chatbot__suggestions">
+                <button
+                  type="button"
+                  className="movie-chatbot__suggestion-chip movie-chatbot__suggestion-chip--surprise"
+                  onClick={startSurprise}
+                  disabled={catalog.allLoaded.length === 0}
+                >
+                  🎲 Surprise Me
+                </button>
                 {EXAMPLE_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}
