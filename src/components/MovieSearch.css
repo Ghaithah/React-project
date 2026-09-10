@@ -475,6 +475,136 @@
   animation: pulse 1.4s ease-in-out infinite;
 }
 
+/* --- "Up Next" autoplay card ---
+   Shown over the trailer frame once a trailer finishes playing through
+   (see handleTrailerEnded/onEnded in MovieSearch.js) — a small floating
+   card in the bottom-right corner of the frame, echoing Netflix's own
+   next-episode/next-title prompt. */
+.movie-search__up-next {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 4;
+  width: min(280px, calc(100% - 32px));
+  background: rgba(13, 15, 20, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+}
+
+.movie-search__up-next-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+}
+
+.movie-search__up-next-cancel {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+  transition: color 0.15s ease;
+}
+
+.movie-search__up-next-cancel:hover,
+.movie-search__up-next-cancel:focus-visible {
+  color: var(--gold);
+}
+
+.movie-search__up-next-body {
+  display: flex;
+  gap: 10px;
+  padding: 0 10px 10px;
+}
+
+.movie-search__up-next-poster {
+  flex: none;
+  width: 60px;
+  height: 84px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.movie-search__up-next-poster--placeholder {
+  background: var(--surface-2);
+}
+
+.movie-search__up-next-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.movie-search__up-next-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.movie-search__up-next-play {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #f2c467, var(--gold) 60%, var(--gold-dim));
+  color: #1a1400;
+  font-weight: 700;
+  font-size: 0.76rem;
+  font-family: inherit;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+  white-space: nowrap;
+}
+
+.movie-search__up-next-play:hover,
+.movie-search__up-next-play:focus-visible {
+  filter: brightness(1.06);
+}
+
+.movie-search__up-next-progress {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.movie-search__up-next-progress-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--gold);
+  transform-origin: left;
+  animation-name: up-next-shrink;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes up-next-shrink {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
 /* --- Title details (rating, runtime, cast, plot, episodes) --- */
 
 .movie-search__detail {
@@ -1452,6 +1582,16 @@
   }
 }
 
+/* Touch long-press preview (see MovieCard.js's touch handlers): the same
+   hover overlay reveal above, triggered by a class the card toggles on
+   itself once a long-press is recognized, rather than by a real :hover
+   state a touchscreen never produces. */
+.movie-card--touch-active .movie-card__hover-overlay {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 .movie-card__hover-genres {
   display: flex;
   flex-wrap: wrap;
@@ -1816,7 +1956,8 @@
   .movie-card__remove-badge,
   .movie-card__mute-toggle,
   .movie-search__trending-poster-wrap,
-  .scrollable-row__arrow {
+  .scrollable-row__arrow,
+  .movie-search__up-next-progress-fill {
     transition: none;
   }
 
@@ -1826,7 +1967,8 @@
   .skeleton-pill,
   .movie-search__trailer-frame--skeleton,
   .movie-search__person-bio-photo--skeleton,
-  .movie-search__load-more-status::before {
+  .movie-search__load-more-status::before,
+  .movie-search__up-next-progress-fill {
     animation: none;
   }
 }

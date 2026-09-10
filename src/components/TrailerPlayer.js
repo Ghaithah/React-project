@@ -34,7 +34,7 @@ const PROGRESS_SAVE_INTERVAL_MS = 5000;
 export const RESUME_MIN_FRACTION = 0.03;
 export const RESUME_MAX_FRACTION = 0.95;
 
-export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress }) {
+export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress, onEnded }) {
   const wrapperRef = useRef(null);
   const playerRef = useRef(null);
   const intervalRef = useRef(null);
@@ -43,6 +43,17 @@ export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress
   useEffect(() => {
     onProgressRef.current = onProgress;
   }, [onProgress]);
+
+  // Same ref-mirror pattern as onProgressRef above: onEnded is read via
+  // this ref (rather than listed in the effect's own dependency array)
+  // so a fresh onEnded closure from the parent re-rendering (which
+  // happens on essentially every state change in MovieSearch.js) never
+  // tears down and reconstructs the real YT.Player this effect is in the
+  // middle of managing.
+  const onEndedRef = useRef(onEnded);
+  useEffect(() => {
+    onEndedRef.current = onEnded;
+  }, [onEnded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +103,12 @@ export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress
               saveProgress();
             } else if (event.data === ENDED) {
               if (onProgressRef.current) onProgressRef.current(1);
+              // Lets the parent offer an "Up Next" autoplay card (see
+              // MovieSearch.js) the same way Netflix chains into the
+              // next episode/title once playback genuinely finishes —
+              // distinct from PAUSED, which just means the visitor
+              // stopped watching partway through.
+              if (onEndedRef.current) onEndedRef.current();
             }
           },
         },
@@ -106,7 +123,7 @@ export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress
       // (closing the panel, opening a different title) doesn't lose
       // whatever progress was made since the last periodic save.
       saveProgress();
-      
+
       try {
         if (playerRef.current && typeof playerRef.current.destroy === 'function') {
           playerRef.current.destroy();

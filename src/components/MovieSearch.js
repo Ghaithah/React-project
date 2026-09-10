@@ -489,7 +489,6 @@ function setCachedTrailerId(imdbID, videoId) {
 
   persistTrailerCacheStore();
 }
-
 // --- YouTube search request budget + throttle ---
 // search.list is YouTube's most expensive endpoint (100 quota units per
 // call) and Google enforces two separate limits on top of each other: a
@@ -1022,7 +1021,6 @@ function movieDecade(movie) {
   const decade = Math.floor(year / 10) * 10;
   return `${decade}s`;
 }
-
 // --- "Hidden Gems For You" row ---
 // A third personalization lens, alongside the seeded "Because You
 // Watched"/"Because You Liked" shelves and the Top 10/New Releases
@@ -1094,6 +1092,14 @@ function readProfileLikedIds(user, profileId) {
 // filter/search (or narrowing the query further) re-enables loading
 // more, same as before.
 const AUTO_LOAD_TARGET_COUNT = 100;
+
+// --- "Up Next" autoplay card ---
+// How long the countdown card shown after a trailer plays through to the
+// end (see handleTrailerEnded/startUpNext below) waits before auto-
+// opening the suggested next title — long enough to read the title and
+// poster and decide whether to cancel, short enough that it doesn't feel
+// like it's stalling, mirroring Netflix's own next-episode prompt.
+const UP_NEXT_DELAY_MS = 8000;
 
 function renderPosterCard(movie, onSelect) {
   return (
@@ -1293,6 +1299,15 @@ export default function MovieSearch() {
   // what drive genreFilter/typeFilter/languageFilter, and this effect
   // must not fight them on re-renders.
   const appliedGenreParamRef = useRef(false);
+
+  // --- "Up Next" autoplay card state ---
+  // `upNext` holds the suggested next title plus a live countdown
+  // (`secondsLeft`) while the card is showing; null means no card is
+  // showing. See startUpNext/cancelUpNext/handleTrailerEnded further
+  // down for the actual logic.
+  const [upNext, setUpNext] = useState(null);
+  const upNextTimeoutRef = useRef(null);
+  const upNextIntervalRef = useRef(null);
 
   // Switching profiles mid-session (Kids <-> regular) should reset the
   // browse grid back to the start of whichever term pool now applies,
@@ -3037,6 +3052,61 @@ export default function MovieSearch() {
     );
   }
 
+  // --- "Up Next" autoplay card ---
+  // Shown in place of the finished trailer once playback reaches the end
+  // (see handleTrailerEnded, wired to TrailerPlayer's onEnded prop
+  // below): a Netflix-style countdown card suggesting the top match from
+  // similarTitles (the same "You Might Also Like" pool already computed
+  // for this title), auto-opening it once the countdown below reaches
+  // zero unless the visitor cancels first.
+  function clearUpNextTimers() {
+    clearTimeout(upNextTimeoutRef.current);
+    clearInterval(upNextIntervalRef.current);
+  }
+
+  function cancelUpNext() {
+    clearUpNextTimers();
+    setUpNext(null);
+  }
+
+  function startUpNext(movie) {
+    clearUpNextTimers();
+    const totalSeconds = Math.round(UP_NEXT_DELAY_MS / 1000);
+    setUpNext({ movie, secondsLeft: totalSeconds });
+    upNextIntervalRef.current = setInterval(() => {
+      setUpNext((prev) => (prev ? { ...prev, secondsLeft: Math.max(0, prev.secondsLeft - 1) } : prev));
+    }, 1000);
+    upNextTimeoutRef.current = setTimeout(() => {
+      clearUpNextTimers();
+      setUpNext(null);
+      openMovie(movie);
+    }, UP_NEXT_DELAY_MS);
+  }
+
+  // TrailerPlayer's onEnded fires once, right when the video genuinely
+  // finishes (see TrailerPlayer.js) — distinct from PAUSED. Guarded on
+  // `upNext` already being set so a re-render/duplicate onEnded call
+  // can't restart the countdown from the top.
+  function handleTrailerEnded() {
+    if (upNext) return;
+    const next = similarTitles[0];
+    if (!next) return;
+    startUpNext(next);
+  }
+
+  // Cancels any pending "Up Next" countdown the moment the visitor
+  // navigates to a different title (including via the countdown's own
+  // auto-open) — otherwise a stale timer from the previous trailer could
+  // fire mid-playback of the new one.
+  useEffect(() => {
+    cancelUpNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMovie?.imdbID]);
+
+  useEffect(() => {
+    return () => clearUpNextTimers();
+  }, []);
+
 
   const similarTitles = useMemo(() => {
     if (!movieDetail || !movieDetail.Genre || movieDetail.Genre === "N/A") return [];
@@ -3497,7 +3567,59 @@ export default function MovieSearch() {
                 videoId={trailerId}
                 initialProgress={getProgress(selectedMovie.imdbID)}
                 onProgress={(fraction) => updateProgress(selectedMovie.imdbID, fraction)}
+                onEnded={handleTrailerEnded}
               />
+            )}
+
+            {upNext && (
+              <div className="movie-search__up-next" role="status">
+                <div className="movie-search__up-next-header">
+                  <span>Up Next</span>
+                  <button
+                    type="button"
+                    className="movie-search__up-next-cancel"
+                    onClick={cancelUpNext}
+                    aria-label="Cancel autoplay"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="movie-search__up-next-body">
+                  {upNext.movie.Poster && upNext.movie.Poster !== "N/A" ? (
+                    <img
+                      className="movie-search__up-next-poster"
+                      src={upNext.movie.Poster}
+                      alt=""
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="movie-search__up-next-poster movie-search__up-next-poster--placeholder" />
+                  )}
+                  <div className="movie-search__up-next-info">
+                    <p className="movie-search__up-next-title">{upNext.movie.Title}</p>
+                    <button
+                      type="button"
+                      className="movie-search__up-next-play"
+                      onClick={() => {
+                        clearUpNextTimers();
+                        setUpNext(null);
+                        openMovie(upNext.movie);
+                      }}
+                    >
+                      ▶ Play now ({upNext.secondsLeft}s)
+                    </button>
+                  </div>
+                </div>
+                <div className="movie-search__up-next-progress">
+                  <div
+                    key={upNext.movie.imdbID}
+                    className="movie-search__up-next-progress-fill"
+                    style={{ animationDuration: `${UP_NEXT_DELAY_MS}ms` }}
+                  />
+                </div>
+              </div>
             )}
           </div>
 

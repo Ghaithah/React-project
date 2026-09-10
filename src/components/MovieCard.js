@@ -6,6 +6,23 @@ import { RESUME_MIN_FRACTION, RESUME_MAX_FRACTION } from './TrailerPlayer';
 // fetch for every card the cursor happened to cross.
 const HOVER_DELAY_MS = 600;
 
+// Touch equivalent of HOVER_DELAY_MS below (see handleTouchStart) — a
+// deliberate long-press is already a much stronger, more intentional
+// signal than a passing mouse hover, so it doesn't need as long a delay
+// to feel deliberate rather than accidental.
+const LONG_PRESS_DELAY_MS = 500;
+// How far a touch can drift before it's treated as a scroll/drag instead
+// of a long-press — without this, starting a swipe through a
+// horizontally-scrolling row would also fire a preview load partway
+// through the gesture.
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
+// A touch-triggered preview has no "mouse left the card" event to clean
+// itself up with the way the desktop hover preview does (handleMouseLeave
+// below) — this is the safety net so a forgotten long-press preview
+// doesn't keep autoplaying muted video indefinitely after a visitor
+// scrolls away.
+const TOUCH_PREVIEW_AUTO_DISMISS_MS = 20000;
+
 // Hover previews are opt-in based on real input capability: `pointer:
 // fine` + `hover: hover` rules out touchscreens (where "hover" is really
 // just the first half of a tap and would otherwise get stuck "on"), and
@@ -16,6 +33,16 @@ function supportsHoverPreview() {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
   return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+}
+
+// The touch-only counterpart to supportsHoverPreview above — gated to
+// genuinely coarse-pointer devices (so a laptop's touchscreen, which
+// also has a real mouse and already gets the hover preview, doesn't
+// double up on both triggers) and to the same reduced-motion opt-out.
+function supportsTouchPreview() {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  return window.matchMedia('(pointer: coarse)').matches;
 }
 
 // --- "NEW" badge ---
@@ -47,6 +74,13 @@ export function isRecentRelease(movie) {
  * rating badge, bottom hover overlay with genre chips + Play) across all
  * three, and adds a Netflix-style hover preview: lingering over the card
  * swaps the poster for a muted, autoplaying trailer clip.
+ *
+ * On a touchscreen there's no hover to linger with, so a long-press
+ * (touch and hold roughly LONG_PRESS_DELAY_MS) is the equivalent
+ * trigger — see handleTouchStart/handleTouchMove/handleTouchEnd below.
+ * It shares the same preview-loading logic (beginPreviewLoad) and
+ * preview state as the mouse path; the two are otherwise independent so
+ * neither trigger interferes with the other's own device class.
  *
  * `resolveTrailerId` is passed down from MovieSearch rather than owned
  * here so every card — in every row, plus the main grid — shares MovieSearch's
@@ -98,6 +132,12 @@ export default function MovieCard({
   const [previewState, setPreviewState] = useState('idle'); // idle | loading | ready | none
   const [previewId, setPreviewId] = useState(null);
   const [muted, setMuted] = useState(true);
+  // Whether the CURRENT preview (if any) was triggered by a touch
+  // long-press rather than a mouse hover — drives movie-card--touch-active
+  // below, which is what makes the hover overlay (genre chips, Play, My
+  // List, thumbs) actually visible on a device with no :hover state to
+  // reveal it via CSS alone.
+  const [touchActive, setTouchActive] = useState(false);
   // OMDb's Poster field frequently points at an Amazon media URL that no
   // longer resolves (removed/expired on Amazon's end, not something this
   // app controls) — that shows up as a 404 in the console and, without
@@ -110,16 +150,37 @@ export default function MovieCard({
   // that resolves after the pointer has already left (or re-entered a
   // different card) is recognized as stale and ignored.
   const requestTokenRef = useRef(0);
+  // Where a touch gesture started (see handleTouchStart/handleTouchMove)
+  // — used to tell a deliberate long-press apart from the start of a
+  // scroll/drag through a horizontally-scrolling row.
+  const touchStartRef = useRef(null);
+  // True once the long-press timer has actually fired for the touch
+  // currently in progress — read by handleTouchEnd to decide whether
+  // this release is "ending a long-press" (suppress the click that would
+  // otherwise follow) or just "the end of an ordinary tap" (let the
+  // click through as normal).
+  const longPressActiveRef = useRef(false);
+  const autoDismissTimerRef = useRef(null);
 
   function resetPreview() {
     clearTimeout(hoverTimerRef.current);
+    clearTimeout(autoDismissTimerRef.current);
     requestTokenRef.current += 1;
     setPreviewState('idle');
     setPreviewId(null);
     setMuted(true);
+    setTouchActive(false);
+    longPressActiveRef.current = false;
+    touchStartRef.current = null;
   }
 
-  useEffect(() => () => clearTimeout(hoverTimerRef.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(hoverTimerRef.current);
+      clearTimeout(autoDismissTimerRef.current);
+    },
+    []
+  );
 
   // Each distinct movie gets its own MovieCard instance (every caller
   // renders these with `key={movie.imdbID}`), so a prior failure never
@@ -130,33 +191,99 @@ export default function MovieCard({
     setPosterFailed(false);
   }, [movie.imdbID]);
 
+  // Shared by both the mouse-hover and touch-long-press triggers below —
+  // resolves this card's trailer id (via the shared cache in
+  // resolveTrailerId) and swaps the poster for the preview once it's
+  // ready. `token` guards against a resolution that arrives after the
+  // pointer/touch has already moved on to something else.
+  function beginPreviewLoad() {
+    const token = ++requestTokenRef.current;
+    setPreviewState('loading');
+    resolveTrailerId(movie)
+      .then((id) => {
+        if (token !== requestTokenRef.current) return; // pointer moved on already
+        if (id) {
+          setPreviewId(id);
+          setPreviewState('ready');
+        } else {
+          setPreviewState('none');
+        }
+      })
+      .catch(() => {
+        if (token !== requestTokenRef.current) return;
+        setPreviewState('none');
+      });
+  }
+
   function handleMouseEnter() {
     if (!resolveTrailerId || !supportsHoverPreview()) return;
-    hoverTimerRef.current = setTimeout(() => {
-      const token = ++requestTokenRef.current;
-      setPreviewState('loading');
-      resolveTrailerId(movie)
-        .then((id) => {
-          if (token !== requestTokenRef.current) return; // pointer moved on already
-          if (id) {
-            setPreviewId(id);
-            setPreviewState('ready');
-          } else {
-            setPreviewState('none');
-          }
-        })
-        .catch(() => {
-          if (token !== requestTokenRef.current) return;
-          setPreviewState('none');
-        });
-    }, HOVER_DELAY_MS);
+    hoverTimerRef.current = setTimeout(beginPreviewLoad, HOVER_DELAY_MS);
   }
 
   function handleMouseLeave() {
     resetPreview();
   }
 
+  // --- Touch long-press (mobile equivalent of the mouse hover above) ---
+  function handleTouchStart(e) {
+    if (!resolveTrailerId || !supportsTouchPreview()) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    longPressActiveRef.current = false;
+    hoverTimerRef.current = setTimeout(() => {
+      longPressActiveRef.current = true;
+      setTouchActive(true);
+      beginPreviewLoad();
+      // Safety net — see TOUCH_PREVIEW_AUTO_DISMISS_MS's comment above.
+      autoDismissTimerRef.current = setTimeout(resetPreview, TOUCH_PREVIEW_AUTO_DISMISS_MS);
+    }, LONG_PRESS_DELAY_MS);
+  }
+
+  function handleTouchMove(e) {
+    if (!touchStartRef.current || longPressActiveRef.current) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+    if (dx > LONG_PRESS_MOVE_TOLERANCE_PX || dy > LONG_PRESS_MOVE_TOLERANCE_PX) {
+      // This is a scroll/drag through the row, not a deliberate
+      // long-press — cancel the pending timer before it ever fires,
+      // same as a mouse leaving the card early cancels handleMouseEnter's
+      // timer via handleMouseLeave.
+      clearTimeout(hoverTimerRef.current);
+      touchStartRef.current = null;
+    }
+  }
+
+  function handleTouchEnd(e) {
+    clearTimeout(hoverTimerRef.current);
+    touchStartRef.current = null;
+    if (longPressActiveRef.current) {
+      // The long-press already opened a preview — this release is what
+      // ends that gesture, not a tap that should activate the card.
+      // Most touch browsers fire a synthetic click after touchend;
+      // preventing it here stops that from immediately jumping past the
+      // preview it just took a long-press to open. A genuine follow-up
+      // tap (a fresh touchstart+touchend that never becomes a long
+      // press) is unaffected and still activates normally via
+      // handleActivate below.
+      e.preventDefault();
+    }
+  }
+
+  function handleTouchCancel() {
+    clearTimeout(hoverTimerRef.current);
+    touchStartRef.current = null;
+  }
+
   function handleActivate() {
+    // A tap that lands while a touch-triggered preview is showing both
+    // dismisses the preview (so the muted clip doesn't keep playing in
+    // the background after navigating away) and proceeds with the
+    // normal activation — mirroring "tap once to preview, tap again to
+    // open" without needing a separate mode.
+    if (touchActive) resetPreview();
     onSelect(movie);
   }
 
@@ -172,10 +299,16 @@ export default function MovieCard({
 
   return (
     <div
-      className={`movie-card movie-card--${variant} ${isFeatured ? 'movie-card--selected' : ''}`}
+      className={`movie-card movie-card--${variant} ${isFeatured ? 'movie-card--selected' : ''} ${
+        touchActive ? 'movie-card--touch-active' : ''
+      }`}
       onClick={handleActivate}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
