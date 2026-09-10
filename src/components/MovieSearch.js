@@ -3333,9 +3333,9 @@ export default function MovieSearch() {
             onClick={playSomething}
             className="movie-search__shuffle-btn"
             disabled={activeMovies.length === 0}
-            title="Play something picked to match your taste"
+            title="Shuffle to a trailer picked to match your taste"
           >
-            🔀 Play Something
+            Shuffle Trailer
           </button>
 
           <button

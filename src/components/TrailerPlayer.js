@@ -69,9 +69,37 @@ export const RESUME_MAX_FRACTION = 0.95;
  * real player per trailer and tears it down when the trailer changes or
  * the panel closes, rather than trying to reconfigure a live player in
  * place.
+ *
+ * --- Why the player target is created imperatively, not with JSX ---
+ * The YouTube IFrame Player API doesn't render INTO the element you
+ * hand it — per YouTube's own docs, it REPLACES that element with a
+ * real <iframe>, removing the original node from the DOM outright. The
+ * previous version of this component handed `new YT.Player(...)` a
+ * React-rendered div (via a ref) directly, so the moment a title's
+ * trailer was opened, YouTube would silently rip that div out of the
+ * document and put an iframe in its place — a DOM mutation React never
+ * finds out about. That was invisible the FIRST time a trailer opened
+ * (nothing had to be torn down yet), but the moment a second trailer
+ * opened — e.g. clicking "Shuffle Trailer" again while one was already
+ * playing — the outgoing <TrailerPlayer key={oldVideoId}> instance had
+ * to unmount, and React tried to remove the div it still believed was
+ * there. It wasn't (YouTube had already swapped it for an iframe), so
+ * the browser threw "Failed to execute 'removeChild' on 'Node'", which
+ * bubbled straight into the nearest error boundary as "This page hit a
+ * snag." Only ever surfaced on the second-and-later trailer for exactly
+ * that reason.
+ *
+ * The fix: React only ever renders and owns `wrapperRef`'s div, and
+ * that div is never the thing handed to `new YT.Player(...)` — a plain
+ * `target` div is created here with `document.createElement`, appended
+ * as a child of the wrapper, and IT is what YouTube is given (and free
+ * to replace with an iframe). React has no opinion about anything
+ * inside the wrapper, so however YouTube rearranges that subtree,
+ * unmounting the wrapper later is a single, ordinary DOM removal with
+ * no conflict.
  */
 export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress }) {
-  const containerRef = useRef(null);
+  const wrapperRef = useRef(null);
   const playerRef = useRef(null);
   const intervalRef = useRef(null);
   // onProgress is a fresh closure on every parent render (it wraps
@@ -98,9 +126,16 @@ export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress
     }
 
     loadYoutubeIframeApi().then((YT) => {
-      if (cancelled || !YT || !containerRef.current) return;
+      if (cancelled || !YT || !wrapperRef.current) return;
 
-      player = new YT.Player(containerRef.current, {
+      // See the "Why the player target is created imperatively" note
+      // above — this is a plain DOM node React never renders or
+      // reconciles, so YouTube is free to replace it with an <iframe>
+      // without React ever needing to know.
+      const target = document.createElement('div');
+      wrapperRef.current.appendChild(target);
+
+      player = new YT.Player(target, {
         videoId,
         playerVars: { autoplay: 1 },
         events: {
@@ -144,8 +179,19 @@ export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress
       // (closing the panel, opening a different title) doesn't lose
       // whatever progress was made since the last periodic save.
       saveProgress();
-      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
-        playerRef.current.destroy();
+      // Guarded: by the time this runs, the wrapper (and whatever
+      // YouTube left inside it) may already be detached from the
+      // document as part of this component unmounting, and destroy()
+      // reaching into an already-detached iframe isn't guaranteed to
+      // be a no-op in every browser. Teardown either way doesn't
+      // depend on destroy() actually succeeding, so a failure here is
+      // safe to swallow rather than letting it crash the page.
+      try {
+        if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+          playerRef.current.destroy();
+        }
+      } catch {
+        // Ignore — see comment above.
       }
       playerRef.current = null;
     };
@@ -157,5 +203,5 @@ export default function TrailerPlayer({ videoId, initialProgress = 0, onProgress
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId]);
 
-  return <div ref={containerRef} className="trailer-player" />;
+  return <div ref={wrapperRef} className="trailer-player" />;
 }
